@@ -1,7 +1,7 @@
-# Version: V26.281.0251
+# Version: V26.281.0302
 # Home Assistant add-on manifest for ApexLunar.
 name: ApexLunar
-version: "0.1.0"
+version: "0.1.1"
 slug: apexlunar
 description: Makes the lunar channel of EcoTech Radion XR15 lights (Neptune Apex MXM module) follow the real moon at your location
 url: https://github.com/mad-science-lab/ApexLunar

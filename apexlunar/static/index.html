@@ -1,4 +1,4 @@
-<!-- Version: V26.281.0250 -->
+<!-- Version: V26.281.0303 -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -179,10 +179,10 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
 <dialog id="mapdlg">
   <div class="dlg-head"><strong>Click the map to set your location</strong><span id="mapmsg">No spot picked yet</span></div>
   <div id="map"></div>
-  <div class="dlg-foot"><span class="help" style="margin:0">Scroll or pinch to zoom. Map &copy; OpenStreetMap contributors.</span>
+  <div class="dlg-foot"><span class="help" style="margin:0">Scroll or pinch to zoom. Map tiles &copy; Esri.</span>
     <div class="row"><button id="mapcancel" type="button">Cancel</button><button class="primary" id="mapuse" type="button" disabled>Use this spot</button></div></div>
 </dialog>
-<div style="position:fixed;bottom:10px;left:10px;font-size:11px;font-family:monospace;color:rgba(128,128,128,0.6);background:rgba(0,0,0,0.15);padding:3px 7px;border-radius:4px;z-index:9999;pointer-events:none;">V26.281.0250</div>
+<div style="position:fixed;bottom:10px;left:10px;font-size:11px;font-family:monospace;color:rgba(128,128,128,0.6);background:rgba(0,0,0,0.15);padding:3px 7px;border-radius:4px;z-index:9999;pointer-events:none;">V26.281.0303</div>
 <script>
 const $ = id => document.getElementById(id);
 let cfg = null, plan = null;
@@ -446,8 +446,10 @@ $("pick").onclick = async () => {
   const lat = +$("lat").value, lon = +$("lon").value;
   if (!map) {
     map = L.map("map", {worldCopyJump: true}).setView(have ? [lat, lon] : [20, 0], have ? 6 : 2);
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-      {maxZoom: 18, attribution: "&copy; OpenStreetMap contributors"}).addTo(map);
+    // Esri World Street Map: no API key, and works without a Referer. OpenStreetMap's
+    // own tile servers blocked the map inside Home Assistant, and CARTO now needs a key.
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+      {maxZoom: 19, attribution: "Tiles &copy; Esri &mdash; Esri, HERE, Garmin, USGS, OpenStreetMap contributors"}).addTo(map);
     map.on("click", e => setPin(e.latlng.lat, e.latlng.lng));
   } else if (have) map.setView([lat, lon], Math.max(map.getZoom(), 6));
   setTimeout(() => map.invalidateSize(), 50);   // the map measured itself while the dialog was hidden
