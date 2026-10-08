@@ -1,4 +1,4 @@
-<!-- Version: V26.281.0145 -->
+<!-- Version: V26.281.0215 -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -52,6 +52,13 @@ pre{white-space:pre-wrap;margin:4px 0 0;font-size:12px;color:var(--muted)}
 .check{display:flex;gap:8px;align-items:center;font-size:14px;color:var(--ink)}
 .check input{width:auto}
 .muted{color:var(--muted);font-size:13px}
+.help{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.4}
+.hint{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;margin:2px 0 10px}
+dialog{border:1px solid var(--line);border-radius:12px;padding:0;width:min(900px,calc(100vw - 32px));background:var(--card);color:var(--ink)}
+dialog::backdrop{background:rgba(0,0,0,.5)}
+.dlg-head,.dlg-foot{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:12px 14px;flex-wrap:wrap}
+#map{height:min(60vh,520px);width:100%;background:var(--bg)}
+#mapmsg{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
@@ -96,14 +103,23 @@ pre{white-space:pre-wrap;margin:4px 0 0;font-size:12px;color:var(--muted)}
         <div class="field"><label for="lat">Latitude (north +)</label><input id="lat" type="number" step="0.0001"></div>
         <div class="field"><label for="lon">Longitude (east +, west −)</label><input id="lon" type="number" step="0.0001"></div>
       </div>
-      <div class="field"><button id="geo" type="button">Use this device's location</button></div>
+      <div class="field row">
+        <button id="pick" type="button">Pick on map</button>
+        <button id="geo" type="button">Use this device's location</button>
+      </div>
     </fieldset>
     <fieldset><legend>Brightness</legend>
       <div class="grid2">
-        <div class="field"><label for="maxi">Full-moon intensity %</label><input id="maxi" type="number" min="0" max="100"></div>
-        <div class="field"><label for="ramp">Full brightness at altitude °</label><input id="ramp" type="number" min="0.5" max="90" step="0.5"></div>
-        <div class="field"><label for="rows">Max table rows</label><input id="rows" type="number" min="3" max="24"></div>
+        <div class="field"><label for="maxi">Full-moon intensity %</label><input id="maxi" type="number" min="0" max="100">
+          <div class="help"><b>How bright.</b> The lunar output's level for a full moon well above the horizon. Other nights scale down by how much of the moon is lit: a half moon gets half of this, a thin crescent a few percent.</div></div>
+        <div class="field"><label for="ramp">Full brightness at altitude °</label><input id="ramp" type="number" min="0.5" max="90" step="0.5">
+          <div class="help"><b>How fast it brightens.</b> At moonrise the light starts at 0 and climbs until the moon is this many degrees above the horizon, then holds. Low = quick fade-in; high (60–90°) = keeps brightening until the moon is highest.</div></div>
+        <div class="field"><label for="rows">Max table rows</label><input id="rows" type="number" min="3" max="24">
+          <div class="help">More rows follow the moon's curve more closely. Rows that wouldn't change anything are skipped.</div></div>
       </div>
+      <div class="hint" id="brighthint"></div>
+      <div class="row" style="margin-bottom:10px"><button id="recommend" type="button">Use recommended</button>
+        <span class="help" style="margin:0">Starting point: 15% and 30°. Watch the tank on a full-moon night and adjust.</span></div>
       <label class="check"><input type="checkbox" id="keepmix"> Keep the color mix already on the Apex</label>
       <div class="grid2" id="mix" style="margin-top:8px"></div>
     </fieldset>
@@ -130,7 +146,13 @@ pre{white-space:pre-wrap;margin:4px 0 0;font-size:12px;color:var(--muted)}
     <div id="backups" class="muted">None yet.</div>
   </section>
 </main>
-<div style="position:fixed;bottom:10px;left:10px;font-size:11px;font-family:monospace;color:rgba(128,128,128,0.6);background:rgba(0,0,0,0.15);padding:3px 7px;border-radius:4px;z-index:9999;pointer-events:none;">V26.281.0145</div>
+<dialog id="mapdlg">
+  <div class="dlg-head"><strong>Click the map to set your location</strong><span id="mapmsg">No spot picked yet</span></div>
+  <div id="map"></div>
+  <div class="dlg-foot"><span class="help" style="margin:0">Scroll or pinch to zoom. Map &copy; OpenStreetMap contributors.</span>
+    <div class="row"><button id="mapcancel" type="button">Cancel</button><button class="primary" id="mapuse" type="button" disabled>Use this spot</button></div></div>
+</dialog>
+<div style="position:fixed;bottom:10px;left:10px;font-size:11px;font-family:monospace;color:rgba(128,128,128,0.6);background:rgba(0,0,0,0.15);padding:3px 7px;border-radius:4px;z-index:9999;pointer-events:none;">V26.281.0215</div>
 <script>
 const $ = id => document.getElementById(id);
 let cfg = null, plan = null;
@@ -207,6 +229,21 @@ function showPlan(p) {
   $("target").textContent = "Writes to " + p.members.map(x => `${x.name} (${x.did})`).join(" + ") +
     (p.members.length > 1 ? " — the group copies the master's table" : "");
   renderMix(p.colors);
+  brightHint();
+}
+
+// Plain-language "what these numbers mean" under the brightness settings.
+function brightHint() {
+  const maxi = +$("maxi").value || 0, ramp = +$("ramp").value || 0;
+  let t = `Full moon: up to <b>${maxi}%</b>. Half moon: up to <b>${Math.round(maxi / 2)}%</b>. ` +
+          `Full brightness once the moon is ${ramp}&deg; above the horizon.`;
+  if (plan) {
+    const m = plan.moon, est = Math.round(maxi * m.illumination * Math.min(m.peak_altitude / ramp, 1));
+    t += `<br>${esc(m.date)}: the moon is ${Math.round(m.illumination * 100)}% lit and climbs to ` +
+         `${Math.round(m.peak_altitude)}&deg;, so these settings peak at about <b>${est}%</b>` +
+         (m.peak_altitude < ramp ? ` (it never reaches ${ramp}&deg; today).` : ".");
+  }
+  $("brighthint").innerHTML = t;
 }
 
 function renderMix(colors) {
@@ -242,6 +279,7 @@ async function loadConfig() {
   $("lat").value = cfg.location.latitude; $("lon").value = cfg.location.longitude;
   $("maxi").value = cfg.table.max_intensity ?? 15; $("ramp").value = cfg.table.ramp_altitude_deg ?? 10;
   $("rows").value = cfg.table.max_rows ?? 12; $("keepmix").checked = !cfg.table.channels;
+  brightHint();
   $("host").value = cfg.apex.host || ""; $("user").value = cfg.apex.username || "";
   $("pw").placeholder = cfg.apex.has_password ? "unchanged" : "not set";
   $("lunar").innerHTML = `<option value="${esc(cfg.apex.lunar_did)}">${esc(cfg.apex.lunar_did)}</option>`;
@@ -297,6 +335,56 @@ $("day").onchange = preview;
 $("apply").onclick = apply;
 $("save").onclick = save;
 $("keepmix").onchange = () => renderMix(plan ? plan.colors : []);
+$("maxi").oninput = brightHint;
+$("ramp").oninput = brightHint;
+$("recommend").onclick = () => {
+  $("maxi").value = 15; $("ramp").value = 30; brightHint();
+  setMsg("savemsg", "Recommended values filled in. Save to use them.");
+};
+
+// ---------- map picker (Leaflet, loaded the first time it's opened)
+let map = null, pin = null, picked = null;
+function loadLeaflet() {
+  if (window.L) return Promise.resolve();
+  return new Promise((ok, fail) => {
+    const css = document.createElement("link");
+    css.rel = "stylesheet"; css.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css";
+    document.head.append(css);
+    const js = document.createElement("script");
+    js.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js";
+    js.onload = ok;
+    js.onerror = () => fail(new Error("Couldn't load the map (it needs an internet connection)."));
+    document.head.append(js);
+  });
+}
+function setPin(lat, lon) {
+  lon = ((lon + 540) % 360) - 180;   // the map wraps; keep longitude in -180..180
+  picked = {lat: +lat.toFixed(4), lon: +lon.toFixed(4)};
+  if (pin) pin.setLatLng([lat, lon]);
+  else pin = L.circleMarker([lat, lon], {radius: 8, color: "#3b5bdb", weight: 3, fillColor: "#f0c94a", fillOpacity: 1}).addTo(map);
+  $("mapmsg").textContent = `${picked.lat}, ${picked.lon}`;
+  $("mapuse").disabled = false;
+}
+$("pick").onclick = async () => {
+  $("mapdlg").showModal();
+  try { await loadLeaflet(); } catch (e) { $("mapmsg").textContent = e.message; return; }
+  const have = $("lat").value !== "" && $("lon").value !== "";
+  const lat = +$("lat").value, lon = +$("lon").value;
+  if (!map) {
+    map = L.map("map", {worldCopyJump: true}).setView(have ? [lat, lon] : [20, 0], have ? 6 : 2);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+      {maxZoom: 18, attribution: "&copy; OpenStreetMap contributors"}).addTo(map);
+    map.on("click", e => setPin(e.latlng.lat, e.latlng.lng));
+  } else if (have) map.setView([lat, lon], Math.max(map.getZoom(), 6));
+  setTimeout(() => map.invalidateSize(), 50);   // the map measured itself while the dialog was hidden
+  if (have) setPin(lat, lon);
+};
+$("mapcancel").onclick = () => $("mapdlg").close();
+$("mapuse").onclick = () => {
+  $("lat").value = picked.lat; $("lon").value = picked.lon; $("mapdlg").close();
+  setMsg("savemsg", `Location set to ${picked.lat}, ${picked.lon}. Save to keep it.`);
+};
+
 $("geo").onclick = () => {
   if (!navigator.geolocation) return setMsg("savemsg", "This browser can't share location.", "err");
   navigator.geolocation.getCurrentPosition(

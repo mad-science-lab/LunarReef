@@ -1,4 +1,4 @@
-<!-- Version: V26.281.0141 -->
+<!-- Version: V26.281.0215 -->
 # ApexLunar
 
 Makes a Neptune Apex's lunar lighting follow the real moon at your location.
@@ -13,7 +13,8 @@ Windows, macOS and Raspberry Pi.
 - **macOS / Pi:** `./run.sh` (add `--bind 0.0.0.0` to open it from a phone on your network)
 - Opens <http://127.0.0.1:8788>. On first run `config.json` is created from `config.example.json`.
 
-In the page: set your location (or "Use this device's location"), pick the lunar
+In the page: set your location ("Pick on map" - needs internet for the map tiles - or
+"Use this device's location"), pick the lunar
 output, **Preview**, then **Apply to Apex**. Tick *Daily update* and leave the app
 running to have it write a fresh table every day.
 
