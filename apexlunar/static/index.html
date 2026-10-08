@@ -1,4 +1,4 @@
-<!-- Version: V26.281.0215 -->
+<!-- Version: V26.281.0236 -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -52,6 +52,12 @@ pre{white-space:pre-wrap;margin:4px 0 0;font-size:12px;color:var(--muted)}
 .check{display:flex;gap:8px;align-items:center;font-size:14px;color:var(--ink)}
 .check input{width:auto}
 .muted{color:var(--muted);font-size:13px}
+.badge{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;border:1px solid var(--line)}
+.badge.on{color:var(--ok);border-color:var(--ok)}.badge.off{color:var(--muted)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px;margin:10px 0}
+.kv dt{color:var(--muted)}.kv dd{margin:0;font-variant-numeric:tabular-nums}
+.act.fail{color:var(--bad)}
+.src{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 5px;margin-right:6px}
 .help{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.4}
 .hint{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;margin:2px 0 10px}
 dialog{border:1px solid var(--line);border-radius:12px;padding:0;width:min(900px,calc(100vw - 32px));background:var(--card);color:var(--ink)}
@@ -131,16 +137,27 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
         <div class="field"><label for="pw">Password</label><input id="pw" type="password" autocomplete="new-password" placeholder="unchanged"></div>
       </div>
     </fieldset>
-    <fieldset><legend>Daily update</legend>
-      <label class="check"><input type="checkbox" id="auto"> Write a new table every day while this app runs</label>
-      <div class="field" style="margin-top:8px"><label for="at">At (Apex clock)</label><input id="at" type="time" style="width:auto"></div>
-    </fieldset>
     <button class="primary" id="save">Save settings</button>
     <div class="msg" id="savemsg"></div>
   </section>
 
   <section class="card">
-    <h2>Activity</h2>
+    <h2>Daily update <span class="badge off" id="schedbadge">checking…</span></h2>
+    <div class="help" style="margin:0 0 6px">A small background job, run by Windows Task Scheduler, writes each new day's
+      table, so this page doesn't need to stay open. It also runs a minute after you log in, to catch up if the
+      computer was off or asleep.</div>
+    <dl class="kv" id="schedinfo"></dl>
+    <div class="row">
+      <label for="at" class="muted" style="margin:0">Run at (this computer's clock)</label>
+      <input id="at" type="time" style="width:auto">
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="primary" id="schedinstall" type="button">Turn on</button>
+      <button id="schedrun" type="button">Run now</button>
+      <button id="schedremove" type="button">Turn off</button>
+    </div>
+    <div class="msg" id="schedmsg"></div>
+    <h2 style="margin-top:18px">Activity</h2>
     <div id="activity" class="muted">Nothing yet.</div>
     <h2 style="margin-top:18px">Backups</h2>
     <div id="backups" class="muted">None yet.</div>
@@ -152,7 +169,7 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
   <div class="dlg-foot"><span class="help" style="margin:0">Scroll or pinch to zoom. Map &copy; OpenStreetMap contributors.</span>
     <div class="row"><button id="mapcancel" type="button">Cancel</button><button class="primary" id="mapuse" type="button" disabled>Use this spot</button></div></div>
 </dialog>
-<div style="position:fixed;bottom:10px;left:10px;font-size:11px;font-family:monospace;color:rgba(128,128,128,0.6);background:rgba(0,0,0,0.15);padding:3px 7px;border-radius:4px;z-index:9999;pointer-events:none;">V26.281.0215</div>
+<div style="position:fixed;bottom:10px;left:10px;font-size:11px;font-family:monospace;color:rgba(128,128,128,0.6);background:rgba(0,0,0,0.15);padding:3px 7px;border-radius:4px;z-index:9999;pointer-events:none;">V26.281.0236</div>
 <script>
 const $ = id => document.getElementById(id);
 let cfg = null, plan = null;
@@ -283,8 +300,6 @@ async function loadConfig() {
   $("host").value = cfg.apex.host || ""; $("user").value = cfg.apex.username || "";
   $("pw").placeholder = cfg.apex.has_password ? "unchanged" : "not set";
   $("lunar").innerHTML = `<option value="${esc(cfg.apex.lunar_did)}">${esc(cfg.apex.lunar_did)}</option>`;
-  $("auto").checked = !!(cfg.schedule && cfg.schedule.auto_apply);
-  $("at").value = (cfg.schedule && cfg.schedule.apply_at) || "00:05";
 }
 
 async function loadOutputs() {
@@ -303,7 +318,6 @@ async function save() {
     table: {max_intensity: +$("maxi").value, ramp_altitude_deg: +$("ramp").value, max_rows: +$("rows").value,
             channels: Object.keys(channels).length ? channels : null},
     apex: {host: $("host").value, username: $("user").value, password: $("pw").value, lunar_did: $("lunar").value},
-    schedule: {auto_apply: $("auto").checked, apply_at: $("at").value || "00:05"},
   };
   try {
     cfg = await api("/api/config", body); $("pw").value = "";
@@ -311,12 +325,45 @@ async function save() {
   } catch (e) { setMsg("savemsg", e.message, "err"); }
 }
 
+// ---------- daily update (Task Scheduler)
+function showSchedule(st) {
+  const on = st.installed;
+  $("schedbadge").textContent = !st.supported ? "not on this system yet" : on ? "on" : "off";
+  $("schedbadge").className = "badge " + (on ? "on" : "off");
+  if (document.activeElement !== $("at")) $("at").value = st.at || st.configured_at || "00:05";
+  const s = st.state || {};
+  const rows = [];
+  if (on) rows.push(["Next run", st.next_run || "—"]);
+  rows.push(["Last run", s.last_run_at ? s.last_run_at.replace("T", " ") + (s.last_run_ok === false ? " (failed)" : "") : "never"]);
+  if (s.last_run_ok === false && s.last_error) rows.push(["Error", s.last_error]);
+  rows.push(["Table on Apex for", s.last_applied || "—"]);
+  $("schedinfo").innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("");
+  $("schedinstall").textContent = on ? "Update time" : "Turn on";
+  $("schedremove").disabled = !on; $("schedrun").disabled = !on;
+  $("schedinstall").disabled = !st.supported;
+}
+async function loadSchedule() {
+  try { showSchedule(await api("/api/schedule")); } catch (e) { setMsg("schedmsg", e.message, "err"); }
+}
+async function schedAction(action) {
+  setMsg("schedmsg", "Working…");
+  try {
+    const r = await api("/api/schedule", {action, at: $("at").value || "00:05"});
+    showSchedule(r); setMsg("schedmsg", r.message, "ok"); loadSide();
+    if (action === "run") setTimeout(() => { loadSchedule(); loadSide(); preview(); }, 8000);
+  } catch (e) { setMsg("schedmsg", e.message, "err"); }
+}
+$("schedinstall").onclick = () => schedAction("install");
+$("schedremove").onclick = () => schedAction("uninstall");
+$("schedrun").onclick = () => schedAction("run");
+
 async function loadSide() {
   try {
     const s = await api("/api/status");
     $("activity").innerHTML = s.activity.length ? s.activity.map(a =>
-      `<div class="act"><div class="t">${esc(a.at)}</div>${esc(a.msg)}${a.lines.length ? `<pre>${esc(a.lines.join("\n"))}</pre>` : ""}</div>`).join("")
-      : (s.state.last_applied ? `Last applied table: ${esc(s.state.last_applied)} (${esc(s.state.last_applied_at)})` : "Nothing yet.");
+      `<div class="act${a.ok === false ? " fail" : ""}"><div class="t"><span class="src">${esc(a.source || "")}</span>${esc(a.at)}</div>` +
+      `${esc(a.msg)}${a.lines && a.lines.length ? `<pre>${esc(a.lines.join("\n"))}</pre>` : ""}</div>`).join("")
+      : "Nothing yet.";
     const b = await api("/api/backups");
     $("backups").innerHTML = b.length ? `<table>${b.slice(0, 15).map(x =>
       `<tr><td>${esc(x.file.slice(0, 15).replace(/(\d{4})(\d\d)(\d\d)-(\d\d)(\d\d)(\d\d)/, "$1-$2-$3 $4:$5"))}</td><td>${esc(x.name)}</td><td><button data-file="${esc(x.file)}">Restore</button></td></tr>`).join("")}</table>`
@@ -395,7 +442,8 @@ $("geo").onclick = () => {
 (async () => {
   try { await loadConfig(); } catch (e) { setMsg("savemsg", e.message, "err"); }
   preview(); loadOutputs(); loadSide();
-  setInterval(loadSide, 60000);
+  loadSchedule();
+  setInterval(() => { loadSide(); loadSchedule(); }, 60000);
 })();
 </script>
 </body>

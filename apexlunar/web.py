@@ -1,90 +1,73 @@
-# Version: V26.281.0206
-"""Local web app: standard-library HTTP server + a daily auto-apply loop."""
+# Version: V26.281.0235
+"""Local web app for configuration, preview and manual changes.
+
+The daily update is NOT run here: it is `python -m apexlunar update`, started by
+the operating system's scheduler (see schedule.py). This page installs/removes
+that schedule and shows what it did, from the shared activity log.
+"""
 from __future__ import annotations
 
 import json
 import threading
-import time
 import traceback
 import webbrowser
-from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from . import schedule
 from . import service as svc
 from .apex import ApexError
 
 STATIC = Path(__file__).resolve().parent / "static"
-STATE_FILE = svc.ROOT / "state.json"
 
 
 class App:
     def __init__(self, config_path: Path):
         self.config_path = config_path
-        self.lock = threading.Lock()          # one Apex conversation at a time
-        self.activity: list[dict] = []
-        self.state = self._load_state()
+        self.lock = threading.Lock()  # one Apex conversation at a time from this page
 
-    # -- persistence
     def cfg(self) -> dict:
         return svc.load_config(self.config_path)
 
-    def _load_state(self) -> dict:
-        try:
-            return json.loads(STATE_FILE.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return {}
-
-    def _save_state(self) -> None:
-        STATE_FILE.write_text(json.dumps(self.state, indent=1), encoding="utf-8")
-
-    def note(self, msg: str, lines: list[str] | None = None) -> None:
-        self.activity.insert(0, {"at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                 "msg": msg, "lines": lines or []})
-        del self.activity[50:]
-
-    # -- actions
     def preview(self, day: str | None) -> dict:
         cfg = self.cfg()
         with self.lock:
             return svc.public(svc.plan(cfg, svc.connect(cfg), day))
 
-    def apply(self, day: str | None, why: str) -> list[str]:
+    def apply(self, day: str | None) -> list[str]:
         cfg = self.cfg()
         with self.lock:
-            apex = svc.connect(cfg)
-            p = svc.plan(cfg, apex, day)
-            lines = svc.apply(cfg, apex, p)
-        self.state["last_applied"] = p["moon"]["date"]
-        self.state["last_applied_at"] = datetime.now().isoformat(timespec="seconds")
-        self._save_state()
-        self.note(f"{why}: applied table for {p['moon']['date']} "
-                  f"({p['moon']['phase']}, {p['moon']['illumination'] * 100:.0f}% lit)", lines)
+            return svc.apply_and_record(cfg, "Manual", day)
+
+    def restore(self, filename: str) -> list[str]:
+        cfg = self.cfg()
+        with self.lock:
+            lines = svc.restore(svc.connect(cfg), filename)
+        svc.log_activity("Manual", "MISMATCH" not in "".join(lines), f"Restored {filename}", lines)
         return lines
 
-    # -- scheduler
-    def scheduler(self) -> None:
-        """Once per controller day, at schedule.apply_at controller time, write the table."""
-        offset_h = None
-        while True:
-            try:
-                cfg = self.cfg()
-                sch = cfg.get("schedule", {})
-                if sch.get("auto_apply"):
-                    if offset_h is None:
-                        with self.lock:
-                            offset_h = svc.connect(cfg).utc_offset_hours()
-                    now = datetime.now(timezone.utc) + timedelta(hours=offset_h)
-                    hh, mm = (int(x) for x in str(sch.get("apply_at", "00:05")).split(":"))
-                    due = now.hour * 60 + now.minute >= hh * 60 + mm
-                    if due and self.state.get("last_applied") != now.date().isoformat():
-                        self.apply(None, "Scheduled")
-                        offset_h = None   # re-read daily in case the Apex changed DST
-            except Exception as e:  # keep the loop alive; show the problem in the UI
-                self.note(f"Scheduled apply failed: {e}")
-                time.sleep(240)
-            time.sleep(60)
+    def schedule_info(self) -> dict:
+        return {**schedule.status(), "configured_at": self.cfg().get("schedule", {}).get("apply_at", "00:05"),
+                "state": svc.read_state()}
+
+    def schedule_action(self, body: dict) -> dict:
+        action = body.get("action")
+        if action == "install":
+            at = str(body.get("at") or "00:05")
+            msg = schedule.install(at)
+            cfg = self.cfg()
+            cfg.setdefault("schedule", {})["apply_at"] = at
+            cfg["schedule"].pop("auto_apply", None)  # pre-scheduler setting
+            svc.save_config(cfg, self.config_path)
+        elif action == "uninstall":
+            msg = schedule.uninstall()
+        elif action == "run":
+            msg = schedule.run_now()
+        else:
+            raise ValueError(f"unknown action {action!r}")
+        svc.log_activity("Manual", True, f"Schedule: {msg}")
+        return {"message": msg, **self.schedule_info()}
 
 
 def make_handler(app: App):
@@ -108,7 +91,7 @@ def make_handler(app: App):
         def _run(self, fn):
             try:
                 self._send(200, fn())
-            except (ApexError, svc.ConfigError, ValueError, KeyError) as e:
+            except (ApexError, svc.ConfigError, schedule.ScheduleError, ValueError, KeyError) as e:
                 self._send(400, {"error": str(e)})
             except Exception as e:
                 traceback.print_exc()
@@ -124,7 +107,8 @@ def make_handler(app: App):
                 "/api/preview": lambda: app.preview(q.get("date") or None),
                 "/api/outputs": lambda: light_outputs(app),
                 "/api/backups": svc.list_backups,
-                "/api/status": lambda: {"activity": app.activity, "state": app.state},
+                "/api/status": lambda: {"activity": svc.read_activity(), "state": svc.read_state()},
+                "/api/schedule": app.schedule_info,
             }
             if url.path in routes:
                 return self._run(routes[url.path])
@@ -132,18 +116,15 @@ def make_handler(app: App):
 
         def do_POST(self):
             path = urlparse(self.path).path
-            if path == "/api/config":
-                return self._run(lambda: save_config(app, self._body()))
-            if path == "/api/apply":
-                return self._run(lambda: {"log": app.apply(self._body().get("date") or None, "Manual")})
-            if path == "/api/restore":
-                def do():
-                    cfg = app.cfg()
-                    with app.lock:
-                        lines = svc.restore(svc.connect(cfg), self._body()["file"])
-                    app.note("Restored backup", lines)
-                    return {"log": lines}
-                return self._run(do)
+            body = self._body()
+            routes = {
+                "/api/config": lambda: save_config(app, body),
+                "/api/apply": lambda: {"log": app.apply(body.get("date") or None)},
+                "/api/restore": lambda: {"log": app.restore(body["file"])},
+                "/api/schedule": lambda: app.schedule_action(body),
+            }
+            if path in routes:
+                return self._run(routes[path])
             self._send(404, {"error": "not found"})
 
     return Handler
@@ -176,12 +157,8 @@ def save_config(app: App, incoming: dict) -> dict:
         "channels": {k: max(0, min(100, int(v))) for k, v in (t.get("channels") or {}).items()} or None,
         "max_rows": max(3, min(24, int(t.get("max_rows", 12)))),
     }
-    s = incoming.get("schedule", {})
-    at = str(s.get("apply_at", "00:05"))
-    hh, mm = (int(x) for x in at.split(":"))
-    cfg["schedule"] = {"auto_apply": bool(s.get("auto_apply")), "apply_at": f"{hh:02d}:{mm:02d}"}
     svc.save_config(cfg, app.config_path)
-    app.note("Settings saved")
+    svc.log_activity("Manual", True, "Settings saved")
     return config_out(cfg)
 
 
@@ -200,7 +177,6 @@ def serve(config_path: Path, bind: str = "127.0.0.1", port: int = 8788, open_bro
     except OSError:
         raise SystemExit(f"Port {port} is already in use - ApexLunar is probably already running. "
                          f"Open http://127.0.0.1:{port}/ or start with --port <other>.")
-    threading.Thread(target=app.scheduler, daemon=True).start()  # only once we own the port
     url = f"http://{'127.0.0.1' if bind in ('0.0.0.0', '') else bind}:{port}/"
     print(f"ApexLunar running at {url}  (Ctrl+C to stop)")
     if open_browser:

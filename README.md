@@ -1,4 +1,4 @@
-<!-- Version: V26.281.0215 -->
+<!-- Version: V26.281.0237 -->
 # ApexLunar
 
 Makes a Neptune Apex's lunar lighting follow the real moon at your location.
@@ -15,8 +15,23 @@ Windows, macOS and Raspberry Pi.
 
 In the page: set your location ("Pick on map" - needs internet for the map tiles - or
 "Use this device's location"), pick the lunar
-output, **Preview**, then **Apply to Apex**. Tick *Daily update* and leave the app
-running to have it write a fresh table every day.
+output, **Preview**, then **Apply to Apex**.
+
+The web page is only for settings and manual changes; it doesn't need to stay open.
+
+## Daily update
+
+A separate one-shot job, `python -m apexlunar update`, writes the new day's table
+(or does nothing if the Apex already has it), logs the result to `logs/activity.jsonl`
+and exits. The operating system's scheduler runs it:
+
+- **Windows:** in the page, *Daily update -> Turn on*, or `python -m apexlunar schedule install --at 00:05`.
+  Creates the Task Scheduler task "ApexLunar Daily Update": daily at that time
+  (computer clock) plus 1 minute after logon, and catches up a missed start. Runs
+  `pythonw.exe`, so no window appears. The page shows the next/last run and every
+  run's result under *Activity*.
+- **macOS / Raspberry Pi:** not automated yet - point cron/launchd/systemd at
+  `python3 -m apexlunar update` in this folder.
 
 Command line, if you prefer:
 
@@ -25,6 +40,8 @@ python -m apexlunar moon                 # phase, moonrise/set for your location
 python -m apexlunar preview [--date D]   # current vs new table, changes nothing
 python -m apexlunar apply --write        # back up, write, verify
 python -m apexlunar restore <backup.json> --write
+python -m apexlunar update               # the daily job: write today's table if needed
+python -m apexlunar schedule install|uninstall|status|run [--at HH:MM]
 ```
 
 ## How the table is built

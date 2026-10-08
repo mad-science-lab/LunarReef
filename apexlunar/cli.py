@@ -1,4 +1,4 @@
-# Version: V26.281.0145
+# Version: V26.281.0234
 """ApexLunar command line.
 
     python -m apexlunar web               local web app (default http://127.0.0.1:8788)
@@ -6,6 +6,8 @@
     python -m apexlunar preview           current vs proposed Apex table (no changes)
     python -m apexlunar apply --write     back up, then write today's table
     python -m apexlunar restore FILE --write
+    python -m apexlunar update            what the daily scheduled task runs
+    python -m apexlunar schedule install [--at HH:MM] | uninstall | status | run
 """
 from __future__ import annotations
 
@@ -61,7 +63,39 @@ def cmd_apply(cfg: dict, args) -> None:
         print("\nPreview only. Re-run with: apply --write")
         return
     print()
-    print("\n".join(svc.apply(cfg, apex, p)))
+    lines = svc.apply(cfg, apex, p)
+    print("\n".join(lines))
+    svc.write_state(last_applied=p["moon"]["date"])
+    svc.log_activity("Command line", True, f"Command line: applied table for {p['moon']['date']}", lines)
+
+
+def cmd_update(cfg: dict, args) -> None:
+    """The scheduled job: write today's table if it changed, log the result, exit."""
+    try:
+        print("\n".join(svc.apply_and_record(cfg, "Scheduled" if args.scheduled else "Update")))
+    except Exception as e:  # already logged; the non-zero exit shows in Task Scheduler
+        sys.exit(f"Update failed: {e}")
+
+
+def cmd_schedule(cfg: dict, args) -> None:
+    from . import schedule
+    if args.action == "install":
+        at = args.at or cfg.get("schedule", {}).get("apply_at", "00:05")
+        print(schedule.install(at))
+        cfg.setdefault("schedule", {})["apply_at"] = at
+        svc.save_config(cfg, args.config)
+    elif args.action == "uninstall":
+        print(schedule.uninstall())
+    elif args.action == "run":
+        print(schedule.run_now())
+    else:
+        st = schedule.status()
+        if not st.get("installed"):
+            print("Not installed." if st.get("supported") else "Not supported on this system yet.")
+        else:
+            print(f"Installed: daily at {st['at']} (and 1 minute after logon)")
+            print(f"Next run:  {st['next_run']}")
+            print(f"Last run:  {st['last_run'] or 'never'}   result: {st['last_result']}")
 
 
 def cmd_restore(cfg: dict, args) -> None:
@@ -97,6 +131,11 @@ def main(argv=None) -> None:
     r = sub.add_parser("restore", help="put a backed-up program back")
     r.add_argument("file")
     r.add_argument("--write", action="store_true")
+    u = sub.add_parser("update", help="write today's table if needed (what the scheduler runs)")
+    u.add_argument("--scheduled", action="store_true", help=argparse.SUPPRESS)
+    sc = sub.add_parser("schedule", help="install/remove the daily background update")
+    sc.add_argument("action", choices=["install", "uninstall", "status", "run"])
+    sc.add_argument("--at", help="HH:MM, computer clock (default from config, else 00:05)")
     args = p.parse_args(argv)
     if args.cmd is None:
         args = p.parse_args(["--config", str(args.config), "web"])  # double-click friendly
@@ -105,7 +144,7 @@ def main(argv=None) -> None:
     try:
         cfg = svc.load_config(args.config)
         {"web": cmd_web, "moon": cmd_moon, "preview": cmd_apply, "apply": cmd_apply,
-         "restore": cmd_restore}[args.cmd](cfg, args)
+         "restore": cmd_restore, "update": cmd_update, "schedule": cmd_schedule}[args.cmd](cfg, args)
     except (ApexError, svc.ConfigError) as e:
         sys.exit(f"Error: {e}")
 

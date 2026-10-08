@@ -1,4 +1,4 @@
-# Version: V26.281.0145
+# Version: V26.281.0234
 """Shared logic for the CLI and the web app: config, planning, writing, backups."""
 from __future__ import annotations
 
@@ -15,6 +15,9 @@ ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG = ROOT / "config.json"
 EXAMPLE_CONFIG = ROOT / "config.example.json"
 BACKUP_DIR = ROOT / "backups"
+STATE_FILE = ROOT / "state.json"
+ACTIVITY_LOG = ROOT / "logs" / "activity.jsonl"
+ACTIVITY_KEEP = 500  # lines kept in the activity log
 
 
 class ConfigError(RuntimeError):
@@ -206,3 +209,66 @@ def restore(apex: Apex, filename: str) -> list[str]:
 def light_outputs(apex: Apex) -> list[dict]:
     return [{"did": o["did"], "name": o["name"], "type": o.get("type"), "gid": o.get("gid")}
             for o in apex.outputs() if "Light" in str(o.get("type"))]
+
+
+# ---------------------------------------------------------------- activity + state
+# Shared by the web app (manual actions) and the scheduled `update` run, so the
+# page shows what the background job did.
+
+def log_activity(source: str, ok: bool, msg: str, lines: list[str] | None = None) -> None:
+    ACTIVITY_LOG.parent.mkdir(exist_ok=True)
+    entry = {"at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "source": source,
+             "ok": ok, "msg": msg, "lines": lines or []}
+    with ACTIVITY_LOG.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(entry) + "\n")
+    all_lines = ACTIVITY_LOG.read_text(encoding="utf-8").splitlines()
+    if len(all_lines) > ACTIVITY_KEEP:
+        ACTIVITY_LOG.write_text("\n".join(all_lines[-ACTIVITY_KEEP:]) + "\n", encoding="utf-8")
+
+
+def read_activity(limit: int = 50) -> list[dict]:
+    try:
+        lines = ACTIVITY_LOG.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    out = []
+    for line in reversed(lines[-limit:]):
+        try:
+            out.append(json.loads(line))
+        except ValueError:
+            continue
+    return out
+
+
+def read_state() -> dict:
+    try:
+        return json.loads(STATE_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def write_state(**changes) -> None:
+    state = read_state()
+    state.update(changes)
+    STATE_FILE.write_text(json.dumps(state, indent=1), encoding="utf-8")
+
+
+def apply_and_record(cfg: dict, source: str, when: str | None = None) -> list[str]:
+    """Plan + apply for a day, then record the outcome. Raises on failure (after logging)."""
+    stamp = datetime.now().isoformat(timespec="seconds")
+    try:
+        apex = connect(cfg)
+        p = plan(cfg, apex, when)
+        lines = apply(cfg, apex, p)
+    except Exception as e:
+        write_state(last_run_at=stamp, last_run_ok=False, last_error=str(e))
+        log_activity(source, False, f"{source}: update failed - {e}")
+        raise
+    m = p["moon"]
+    changed = not lines[0].endswith("nothing to write")
+    write_state(last_run_at=stamp, last_run_ok=True, last_error=None, last_applied=m["date"],
+                **({"last_written_at": stamp} if changed else {}))
+    summary = (f"{source}: {'wrote' if changed else 'already current -'} table for {m['date']} "
+               f"({m['phase']}, {m['illumination'] * 100:.0f}% lit, {len(p['proposed'])} rows)")
+    log_activity(source, True, summary, lines)
+    return [summary] + lines
