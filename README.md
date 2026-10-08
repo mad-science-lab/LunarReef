@@ -1,11 +1,27 @@
-<!-- Version: V26.281.0237 -->
+<!-- Version: V26.281.0247 -->
 # ApexLunar
 
-Makes a Neptune Apex's lunar lighting follow the real moon at your location.
+Makes the lunar (moonlight) channel of EcoTech Radion XR15 lights on a Neptune Apex
+follow the real moon at your location.
 Enter a latitude and longitude; ApexLunar works out the moon's phase and when it
 is above your horizon, and writes a matching control table to the lunar output
 on the Apex. Pure Python 3.9+ standard library, so no installs: runs the same on
 Windows, macOS and Raspberry Pi.
+
+## Designed for
+
+**EcoTech Radion XR15 lights connected to the Apex through a Neptune MXM module.**
+
+- The Apex lists each Radion's lunar (moonlight) channel as its own output, type
+  `MXMLight|Ecotech|15G6PL` (White + Blue), alongside the main light
+  `MXMLight|Ecotech|15G6P`. ApexLunar writes the lunar output's schedule table.
+- With more than one Radion, group their lunar outputs in Apex Fusion and pick the
+  group master; the Apex copies the table to the rest of the group.
+- Developed and tested on an Apex running AOS 5.15L with two Radion XR15 G6 Pro.
+
+Other MXM lights with a schedule table (other Radion models, AI Prime/Hydra) use
+the same `tdata` format and may work, but are untested. Lights that aren't on the
+MXM module are not supported.
 
 ## Run it
 
