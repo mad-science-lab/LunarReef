@@ -1,13 +1,13 @@
-# Version: V26.281.0251
-"""Install the daily `apexlunar update` run with the operating system's scheduler.
+# Version: V26.281.1108
+"""Install the daily `lunarreef update` run with the operating system's scheduler.
 
 Windows: a Task Scheduler task with two triggers - every day at the chosen time
 (computer clock) and one minute after logon, so a day missed while the PC was
 off or asleep is caught up. "Run as soon as possible after a missed start" is
 on too. The task runs pythonw.exe, so no console window flashes.
 
-Home Assistant add-on (APEXLUNAR_ADDON=1): there is no OS scheduler to call, so
-`apexlunar scheduler` (runner.py) runs beside the web app in the container and
+Home Assistant add-on (LUNARREEF_ADDON=1): there is no OS scheduler to call, so
+`lunarreef scheduler` (runner.py) runs beside the web app in the container and
 these functions just turn it on/off and set its time in config.json.
 
 macOS (launchd) and Raspberry Pi (systemd timer) are planned; the `update`
@@ -28,8 +28,8 @@ from xml.sax.saxutils import escape
 from . import service as svc
 from .service import ROOT
 
-TASK_NAME = "ApexLunar Daily Update"
-ADDON = os.environ.get("APEXLUNAR_ADDON") == "1"
+TASK_NAME = "LunarReef Daily Update"
+ADDON = os.environ.get("LUNARREEF_ADDON") == "1"
 
 
 class ScheduleError(RuntimeError):
@@ -54,7 +54,7 @@ def _task_xml(at: str, user: str) -> str:
     return f"""<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo>
-    <Description>Writes today's moon-matched lunar table to the Apex. Installed by ApexLunar ({escape(str(ROOT))}).</Description>
+    <Description>Writes today's moon-matched lunar table to the Apex. Installed by LunarReef ({escape(str(ROOT))}).</Description>
   </RegistrationInfo>
   <Triggers>
     <CalendarTrigger>
@@ -87,7 +87,7 @@ def _task_xml(at: str, user: str) -> str:
   <Actions Context="Author">
     <Exec>
       <Command>{escape(_windows_python())}</Command>
-      <Arguments>-m apexlunar update --scheduled</Arguments>
+      <Arguments>-m lunarreef update --scheduled</Arguments>
       <WorkingDirectory>{escape(str(ROOT))}</WorkingDirectory>
     </Exec>
   </Actions>
@@ -98,7 +98,7 @@ def _task_xml(at: str, user: str) -> str:
 def _require_windows() -> None:
     if sys.platform != "win32":
         raise ScheduleError("Scheduling is Windows-only so far; macOS and Raspberry Pi are next. "
-                            "Meanwhile, run `python -m apexlunar update` from cron or launchd.")
+                            "Meanwhile, run `python -m lunarreef update` from cron or launchd.")
 
 
 def install(at: str = "00:05") -> str:
@@ -133,7 +133,7 @@ def uninstall() -> str:
 
 def run_now() -> str:
     if ADDON:
-        subprocess.Popen([sys.executable, "-m", "apexlunar", "update", "--scheduled"], cwd=str(ROOT))
+        subprocess.Popen([sys.executable, "-m", "lunarreef", "update", "--scheduled"], cwd=str(ROOT))
         return "Started an update."
     _require_windows()
     r = _run(["schtasks", "/Run", "/TN", TASK_NAME])

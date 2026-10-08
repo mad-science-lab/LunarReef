@@ -1,11 +1,11 @@
-# Version: V26.281.0300
-"""`apexlunar scheduler`: the background scheduler for places with no OS scheduler
+# Version: V26.281.1108
+"""`lunarreef scheduler`: the background scheduler for places with no OS scheduler
 to call - the Home Assistant add-on container.
 
 A separate process from the web app. Once a minute it reads config.json, and if
 the daily update is on, today's run hasn't happened and the clock has passed
 schedule.apply_at (this machine's clock), it runs the same update as
-`apexlunar update`. On start-up that also catches up a run missed while the
+`lunarreef update`. On start-up that also catches up a run missed while the
 add-on was stopped. A failed run is retried every 15 minutes until it works.
 """
 from __future__ import annotations
@@ -32,7 +32,7 @@ def due(now: datetime, cfg: dict, state: dict) -> bool:
 
 
 def main() -> None:
-    print("ApexLunar scheduler running", flush=True)
+    print("LunarReef scheduler running", flush=True)
     while True:
         now = datetime.now()
         try:

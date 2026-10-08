@@ -1,10 +1,10 @@
-<!-- Version: V26.281.0303 -->
+<!-- Version: V26.281.1108 -->
 <!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ApexLunar</title>
+<title>LunarReef</title>
 <style>
 :root{
   --bg:#f4f5f8;--card:#ffffff;--ink:#1b1e27;--muted:#636a7a;--line:#dfe2ea;
@@ -75,7 +75,7 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
 <body>
 <header>
   <svg id="moonicon" width="44" height="44" viewBox="-1.1 -1.1 2.2 2.2" aria-hidden="true"></svg>
-  <div><h1>ApexLunar</h1><div class="sub" id="subtitle">Matching your Apex lunar lights to the real moon</div>
+  <div><h1>LunarReef</h1><div class="sub" id="subtitle">Matching your Apex lunar lights to the real moon</div>
     <div class="sub" style="font-size:12px">For EcoTech Radion XR15 lunar channels on a Neptune Apex MXM module</div></div>
 </header>
 <main>
@@ -182,7 +182,7 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
   <div class="dlg-foot"><span class="help" style="margin:0">Scroll or pinch to zoom. Map tiles &copy; Esri.</span>
     <div class="row"><button id="mapcancel" type="button">Cancel</button><button class="primary" id="mapuse" type="button" disabled>Use this spot</button></div></div>
 </dialog>
-<div style="position:fixed;bottom:10px;left:10px;font-size:11px;font-family:monospace;color:rgba(128,128,128,0.6);background:rgba(0,0,0,0.15);padding:3px 7px;border-radius:4px;z-index:9999;pointer-events:none;">V26.281.0303</div>
+<div style="position:fixed;bottom:10px;left:10px;font-size:11px;font-family:monospace;color:rgba(128,128,128,0.6);background:rgba(0,0,0,0.15);padding:3px 7px;border-radius:4px;z-index:9999;pointer-events:none;">V26.281.1108</div>
 <script>
 const $ = id => document.getElementById(id);
 let cfg = null, plan = null;
@@ -328,7 +328,7 @@ const isRadionLunar = t => /^MXMLight\|Ecotech\|\w*PL$/i.test(t || "");
 function lunarWarn() {
   const opt = $("lunar").selectedOptions[0], t = opt ? opt.dataset.type : "";
   $("lunarwarn").textContent = t && !isRadionLunar(t)
-    ? `Heads up: this output is "${t}", not a Radion lunar channel. ApexLunar will rewrite its schedule table.` : "";
+    ? `Heads up: this output is "${t}", not a Radion lunar channel. LunarReef will rewrite its schedule table.` : "";
 }
 $("lunar").onchange = lunarWarn;
 
@@ -356,7 +356,7 @@ function showSchedule(st) {
     ? "A small background job, run by Windows Task Scheduler, writes each new day's table, so this page doesn't need to stay open. It also runs a minute after you log in, to catch up if the computer was off or asleep."
     : st.backend
     ? "A small background job inside the add-on writes each new day's table, so this page doesn't need to stay open. If the add-on was stopped at the scheduled time, it catches up as soon as it starts."
-    : "Automatic daily updates aren't set up for this system yet. Run \"python -m apexlunar update\" from your own scheduler.";
+    : "Automatic daily updates aren't set up for this system yet. Run \"python -m lunarreef update\" from your own scheduler.";
   if (document.activeElement !== $("at")) $("at").value = st.at || st.configured_at || "00:05";
   const s = st.state || {};
   const rows = [];
@@ -498,7 +498,7 @@ function whyText() {
 
     <h3>6. Why it's made of straight lines</h3>
     <p>The Apex doesn't store a curve. It stores up to your row limit of points (today: <b>${rows}</b>, the dots)
-    and fades in a straight line between them. ApexLunar puts the dots where they best follow the real curve,
+    and fades in a straight line between them. LunarReef puts the dots where they best follow the real curve,
     so the corners are where the moon's brightness bends most.</p>`;
   if (m.rises.length && m.sets.length) html += `
     <h3>7. "The light is on in the daytime?"</h3>

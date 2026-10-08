@@ -1,7 +1,7 @@
-# Version: V26.281.0235
+# Version: V26.281.1108
 """Local web app for configuration, preview and manual changes.
 
-The daily update is NOT run here: it is `python -m apexlunar update`, started by
+The daily update is NOT run here: it is `python -m lunarreef update`, started by
 the operating system's scheduler (see schedule.py). This page installs/removes
 that schedule and shows what it did, from the shared activity log.
 """
@@ -175,10 +175,10 @@ def serve(config_path: Path, bind: str = "127.0.0.1", port: int = 8788, open_bro
     try:
         httpd = ThreadingHTTPServer((bind, port), make_handler(app))
     except OSError:
-        raise SystemExit(f"Port {port} is already in use - ApexLunar is probably already running. "
+        raise SystemExit(f"Port {port} is already in use - LunarReef is probably already running. "
                          f"Open http://127.0.0.1:{port}/ or start with --port <other>.")
     url = f"http://{'127.0.0.1' if bind in ('0.0.0.0', '') else bind}:{port}/"
-    print(f"ApexLunar running at {url}  (Ctrl+C to stop)")
+    print(f"LunarReef running at {url}  (Ctrl+C to stop)")
     if open_browser:
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()
     try:

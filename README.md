@@ -1,9 +1,9 @@
-<!-- Version: V26.281.0255 -->
-# ApexLunar
+<!-- Version: V26.281.1108 -->
+# LunarReef
 
 Makes the lunar (moonlight) channel of EcoTech Radion XR15 lights on a Neptune Apex
 follow the real moon at your location.
-Enter a latitude and longitude; ApexLunar works out the moon's phase and when it
+Enter a latitude and longitude; LunarReef works out the moon's phase and when it
 is above your horizon, and writes a matching control table to the lunar output
 on the Apex. Pure Python 3.9+ standard library, so no installs: runs the same on
 Windows, macOS and Raspberry Pi.
@@ -14,7 +14,7 @@ Windows, macOS and Raspberry Pi.
 
 - The Apex lists each Radion's lunar (moonlight) channel as its own output, type
   `MXMLight|Ecotech|15G6PL` (White + Blue), alongside the main light
-  `MXMLight|Ecotech|15G6P`. ApexLunar writes the lunar output's schedule table.
+  `MXMLight|Ecotech|15G6P`. LunarReef writes the lunar output's schedule table.
 - With more than one Radion, group their lunar outputs in Apex Fusion and pick the
   group master; the Apex copies the table to the rest of the group.
 - Developed and tested on an Apex running AOS 5.15L with two Radion XR15 G6 Pro.
@@ -37,24 +37,24 @@ The web page is only for settings and manual changes; it doesn't need to stay op
 
 ## Daily update
 
-A separate one-shot job, `python -m apexlunar update`, writes the new day's table
+A separate one-shot job, `python -m lunarreef update`, writes the new day's table
 (or does nothing if the Apex already has it), logs the result to `logs/activity.jsonl`
 and exits. The operating system's scheduler runs it:
 
-- **Windows:** in the page, *Daily update -> Turn on*, or `python -m apexlunar schedule install --at 00:05`.
-  Creates the Task Scheduler task "ApexLunar Daily Update": daily at that time
+- **Windows:** in the page, *Daily update -> Turn on*, or `python -m lunarreef schedule install --at 00:05`.
+  Creates the Task Scheduler task "LunarReef Daily Update": daily at that time
   (computer clock) plus 1 minute after logon, and catches up a missed start. Runs
   `pythonw.exe`, so no window appears. The page shows the next/last run and every
   run's result under *Activity*.
 - **macOS / Raspberry Pi:** not automated yet - point cron/launchd/systemd at
-  `python3 -m apexlunar update` in this folder.
+  `python3 -m lunarreef update` in this folder.
 
 ## Home Assistant add-on
 
-`addon/` packages ApexLunar as a local Home Assistant add-on (a Docker container
+`addon/` packages LunarReef as a local Home Assistant add-on (a Docker container
 managed by HA). The settings page opens from the HA sidebar through Ingress (HA's
 login, no published port); the daily update runs in the container via
-`apexlunar scheduler` on HA's timezone and catches up after a restart; settings,
+`lunarreef scheduler` on HA's timezone and catches up after a restart; settings,
 backups and the log live in the add-on's `/data`; on first start the location is
 taken from HA's home.
 
@@ -64,17 +64,17 @@ taken from HA's home.
 
 Copy `distpexlunar` to `\<ha-ip>ddonspexlunar` (Samba add-on), then in HA:
 *Settings > Add-ons > Add-on Store > three-dot menu > Check for updates* and
-install **ApexLunar** from *Local add-ons*.
+install **LunarReef** from *Local add-ons*.
 
 Command line, if you prefer:
 
 ```
-python -m apexlunar moon                 # phase, moonrise/set for your location
-python -m apexlunar preview [--date D]   # current vs new table, changes nothing
-python -m apexlunar apply --write        # back up, write, verify
-python -m apexlunar restore <backup.json> --write
-python -m apexlunar update               # the daily job: write today's table if needed
-python -m apexlunar schedule install|uninstall|status|run [--at HH:MM]
+python -m lunarreef moon                 # phase, moonrise/set for your location
+python -m lunarreef preview [--date D]   # current vs new table, changes nothing
+python -m lunarreef apply --write        # back up, write, verify
+python -m lunarreef restore <backup.json> --write
+python -m lunarreef update               # the daily job: write today's table if needed
+python -m lunarreef schedule install|uninstall|status|run [--at HH:MM]
 ```
 
 ## How the table is built
@@ -97,7 +97,7 @@ object to `backups/` first.
 
 **Groups:** write the group master. Verified on AOS 5.15L: the Apex copies the
 master's table to the other members of the group (`Lunar` 3_66 -> `Lunar_3_67` 3_67).
-ApexLunar checks each member afterwards and writes any that did not follow.
+LunarReef checks each member afterwards and writes any that did not follow.
 
 ## Config
 
@@ -105,3 +105,10 @@ ApexLunar checks each member afterwards and writes any that did not follow.
 test unit. `APEX_HOST`, `APEX_USER`, `APEX_PASSWORD` environment variables
 override the file. `table.channels` = `null` keeps the color mix already on the
 Apex; or set e.g. `{"White": 20, "Blue": 100}`.
+
+## Trademarks
+
+LunarReef is an independent project, not affiliated with or endorsed by Neptune
+Systems or EcoTech Marine. Neptune Apex is a trademark of Neptune Systems; EcoTech
+and Radion are trademarks of EcoTech Marine. They are named only to describe the
+equipment LunarReef works with.

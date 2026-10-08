@@ -1,14 +1,14 @@
-# Version: V26.281.0251
-"""ApexLunar command line.
+# Version: V26.281.1108
+"""LunarReef command line.
 
-    python -m apexlunar web               local web app (default http://127.0.0.1:8788)
-    python -m apexlunar moon              moon phase, rise/set for your location
-    python -m apexlunar preview           current vs proposed Apex table (no changes)
-    python -m apexlunar apply --write     back up, then write today's table
-    python -m apexlunar restore FILE --write
-    python -m apexlunar update            what the daily scheduled task runs
-    python -m apexlunar schedule install [--at HH:MM] | uninstall | status | run
-    python -m apexlunar scheduler         built-in daily loop (Home Assistant add-on)
+    python -m lunarreef web               local web app (default http://127.0.0.1:8788)
+    python -m lunarreef moon              moon phase, rise/set for your location
+    python -m lunarreef preview           current vs proposed Apex table (no changes)
+    python -m lunarreef apply --write     back up, then write today's table
+    python -m lunarreef restore FILE --write
+    python -m lunarreef update            what the daily scheduled task runs
+    python -m lunarreef schedule install [--at HH:MM] | uninstall | status | run
+    python -m lunarreef scheduler         built-in daily loop (Home Assistant add-on)
 """
 from __future__ import annotations
 
@@ -121,7 +121,7 @@ def cmd_scheduler(cfg: dict, args) -> None:
 
 
 def main(argv=None) -> None:
-    p = argparse.ArgumentParser(prog="apexlunar", description="Match Apex lunar lighting to the real moon.")
+    p = argparse.ArgumentParser(prog="lunarreef", description="Match Apex lunar lighting to the real moon.")
     p.add_argument("--config", type=Path, default=svc.DEFAULT_CONFIG)
     sub = p.add_subparsers(dest="cmd")
     w = sub.add_parser("web", help="run the local web app (default)")

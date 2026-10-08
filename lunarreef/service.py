@@ -1,4 +1,4 @@
-# Version: V26.281.0251
+# Version: V26.281.1108
 """Shared logic for the CLI and the web app: config, planning, writing, backups."""
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from .table import (TableSettings, build_rows, fmt_minute, parse_tdata, replace_
 ROOT = Path(__file__).resolve().parent.parent
 # Where settings, backups, state and the log live. The project folder by default;
 # the Home Assistant add-on points this at its persistent /data.
-DATA_DIR = Path(os.environ.get("APEXLUNAR_DATA") or ROOT)
+DATA_DIR = Path(os.environ.get("LUNARREEF_DATA") or ROOT)
 DEFAULT_CONFIG = DATA_DIR / "config.json"
 EXAMPLE_CONFIG = ROOT / "config.example.json"
 BACKUP_DIR = DATA_DIR / "backups"

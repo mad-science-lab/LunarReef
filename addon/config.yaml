@@ -1,10 +1,10 @@
-# Version: V26.281.0302
-# Home Assistant add-on manifest for ApexLunar.
-name: ApexLunar
-version: "0.1.1"
-slug: apexlunar
+# Version: V26.281.1108
+# Home Assistant add-on manifest for LunarReef.
+name: LunarReef
+version: "0.2.0"
+slug: lunarreef
 description: Makes the lunar channel of EcoTech Radion XR15 lights (Neptune Apex MXM module) follow the real moon at your location
-url: https://github.com/mad-science-lab/ApexLunar
+url: https://github.com/mad-science-lab/LunarReef
 arch:
   - aarch64
   - amd64
@@ -17,7 +17,7 @@ boot: auto
 ingress: true
 ingress_port: 8788
 panel_icon: mdi:moon-waning-crescent
-panel_title: ApexLunar
+panel_title: LunarReef
 
 # Read-only use of Home Assistant's API for one thing: on first start, take the
 # latitude/longitude from HA's home location.

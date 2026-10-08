@@ -1,4 +1,4 @@
-# Version: V26.281.0251
+# Version: V26.281.1108
 ARG BUILD_FROM
 FROM $BUILD_FROM
 
@@ -6,8 +6,8 @@ FROM $BUILD_FROM
 RUN apk add --no-cache python3 tzdata
 
 # Staged into this folder by build_addon.ps1
-COPY apexlunar/ /opt/apexlunar/apexlunar/
-COPY config.example.json /opt/apexlunar/
+COPY lunarreef/ /opt/lunarreef/lunarreef/
+COPY config.example.json /opt/lunarreef/
 
 COPY run.sh /
 RUN chmod a+x /run.sh

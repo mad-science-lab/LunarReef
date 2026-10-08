@@ -1,5 +1,9 @@
-<!-- Version: V26.281.0303 -->
+<!-- Version: V26.281.1108 -->
 # Changelog
+
+## 0.2.0
+- Renamed from ApexLunar to LunarReef (new add-on slug `lunarreef`). Settings don't
+  carry over from the old add-on: re-enter them once in the new page.
 
 ## 0.1.1
 - Map picker: switch to Esri World Street Map tiles. OpenStreetMap's tile servers
