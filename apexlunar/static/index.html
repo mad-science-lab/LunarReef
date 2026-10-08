@@ -1,4 +1,4 @@
-<!-- Version: V26.281.0236 -->
+<!-- Version: V26.281.0239 -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -52,6 +52,11 @@ pre{white-space:pre-wrap;margin:4px 0 0;font-size:12px;color:var(--muted)}
 .check{display:flex;gap:8px;align-items:center;font-size:14px;color:var(--ink)}
 .check input{width:auto}
 .muted{color:var(--muted);font-size:13px}
+.thinker{border-radius:999px;width:34px;height:34px;padding:0;font-size:19px;line-height:1;margin-left:auto}
+.thinker:hover{transform:rotate(-12deg)}
+#whybody{padding:4px 18px 8px;max-height:65vh;overflow:auto;font-size:14px}
+#whybody h3{font-size:14px;margin:14px 0 4px}
+#whybody p{margin:0 0 6px}
 .badge{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;border:1px solid var(--line)}
 .badge.on{color:var(--ok);border-color:var(--ok)}.badge.off{color:var(--muted)}
 .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px;margin:10px 0}
@@ -93,6 +98,7 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
       <span><span class="sw" style="background:var(--moon)"></span>New table (master %)</span>
       <span><span class="sw" style="background:var(--old)"></span>Table on the Apex now</span>
       <span><span class="sw" style="background:var(--alt)"></span>Moon altitude (right axis)</span>
+      <button class="thinker" id="why" type="button" title="Looks funny?" aria-label="Looks funny? Why the lines don't line up">&#129300;</button>
     </div>
     <div class="msg" id="applymsg"></div>
     <div class="tables" style="margin-top:12px">
@@ -163,13 +169,17 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
     <div id="backups" class="muted">None yet.</div>
   </section>
 </main>
+<dialog id="whydlg">
+  <div class="dlg-head"><strong>Why don't the two lines line up?</strong><button id="whyclose" type="button">Close</button></div>
+  <div id="whybody"></div>
+</dialog>
 <dialog id="mapdlg">
   <div class="dlg-head"><strong>Click the map to set your location</strong><span id="mapmsg">No spot picked yet</span></div>
   <div id="map"></div>
   <div class="dlg-foot"><span class="help" style="margin:0">Scroll or pinch to zoom. Map &copy; OpenStreetMap contributors.</span>
     <div class="row"><button id="mapcancel" type="button">Cancel</button><button class="primary" id="mapuse" type="button" disabled>Use this spot</button></div></div>
 </dialog>
-<div style="position:fixed;bottom:10px;left:10px;font-size:11px;font-family:monospace;color:rgba(128,128,128,0.6);background:rgba(0,0,0,0.15);padding:3px 7px;border-radius:4px;z-index:9999;pointer-events:none;">V26.281.0236</div>
+<div style="position:fixed;bottom:10px;left:10px;font-size:11px;font-family:monospace;color:rgba(128,128,128,0.6);background:rgba(0,0,0,0.15);padding:3px 7px;border-radius:4px;z-index:9999;pointer-events:none;">V26.281.0239</div>
 <script>
 const $ = id => document.getElementById(id);
 let cfg = null, plan = null;
@@ -427,6 +437,59 @@ $("pick").onclick = async () => {
   if (have) setPin(lat, lon);
 };
 $("mapcancel").onclick = () => $("mapdlg").close();
+
+// ---------- "Looks funny?" explainer, filled in with the day being previewed
+function whyText() {
+  if (!plan) return "<p>Run a preview first, then this will explain that day's chart.</p>";
+  const m = plan.moon, t = (cfg && cfg.table) || {};
+  const maxi = t.max_intensity ?? 15, ramp = t.ramp_altitude_deg ?? 10;
+  const lit = Math.round(m.illumination * 100), ceiling = Math.round(maxi * m.illumination);
+  const hhmm = n => String(Math.floor(n / 60)).padStart(2, "0") + ":" + String(n % 60).padStart(2, "0");
+  const above = m.curve.filter(c => c.alt >= ramp);
+  const rows = plan.proposed.length;
+  const rise = m.rises.join(" and ") || "none today", set = m.sets.join(" and ") || "none today";
+  let html = `
+    <h3>1. They're measuring different things</h3>
+    <p>The <b>gold line</b> is how bright the lunar LEDs are (left axis, %). The <b>dashed line</b> is how high
+    the moon is in the sky (right axis, degrees). The dotted line across the middle is the horizon (0&deg;).
+    They share a time axis, but not a scale, so they're not meant to sit on top of each other.</p>
+
+    <h3>2. The light only cares about the moon once it's above the horizon</h3>
+    <p>The dashed line keeps going below 0&deg; because the moon is still there, just under your horizon.
+    The light is simply off then. Moonrise today is <b>${esc(rise)}</b> and moonset <b>${esc(set)}</b>:
+    that's where the dashed line crosses the dotted horizon line, and where the gold line leaves or returns to 0%.</p>
+
+    <h3>3. Why the top is flat instead of following the moon's arc</h3>
+    <p>Your <i>Full brightness at altitude</i> setting is <b>${ramp}&deg;</b>. The light climbs from 0 while the moon
+    rises to ${ramp}&deg;, then holds. ` + (above.length
+      ? `Today the moon passes ${ramp}&deg; around <b>${hhmm(above[0].m)}</b> and drops back below it around
+         <b>${hhmm(above[above.length - 1].m)}</b>. In between it keeps climbing to ${Math.round(m.peak_altitude)}&deg;
+         at ${m.peak_time}, but the light is already at full.`
+      : `Today the moon only reaches ${Math.round(m.peak_altitude)}&deg;, so it never gets to full brightness.`) +
+    ` Want the light to peak when the moon is highest? Set that value near ${Math.max(Math.round(m.peak_altitude), 10)}&deg;.</p>
+
+    <h3>4. How tall the gold line gets is about the phase, not the height</h3>
+    <p>The moon is <b>${lit}%</b> lit, and your full-moon intensity is <b>${maxi}%</b>, so the light tops out
+    around <b>${ceiling}%</b> however high the moon climbs. A full moon and a thin crescent can trace almost the
+    same dashed arc and still give very different gold lines.</p>
+
+    <h3>5. Why the top slopes a little</h3>
+    <p>The moon's phase changes through the day: it's ${m.waxing ? "waxing, so a bit more of it is lit by evening" :
+      "waning, so a bit less of it is lit by evening"}. That small change tilts the flat part of the gold line.</p>
+
+    <h3>6. Why it's made of straight lines</h3>
+    <p>The Apex doesn't store a curve. It stores up to your row limit of points (today: <b>${rows}</b>, the dots)
+    and fades in a straight line between them. ApexLunar puts the dots where they best follow the real curve,
+    so the corners are where the moon's brightness bends most.</p>`;
+  if (m.rises.length && m.sets.length) html += `
+    <h3>7. "The light is on in the daytime?"</h3>
+    <p>Yes, on purpose for now: the light follows the moon whenever it's above the horizon, and the moon is
+    often up during the day. With the main lights on you won't notice it.</p>`;
+  return html;
+}
+$("why").onclick = () => { $("whybody").innerHTML = whyText(); $("whydlg").showModal(); };
+$("whyclose").onclick = () => $("whydlg").close();
+$("whydlg").addEventListener("click", e => { if (e.target === $("whydlg")) $("whydlg").close(); });
 $("mapuse").onclick = () => {
   $("lat").value = picked.lat; $("lon").value = picked.lon; $("mapdlg").close();
   setMsg("savemsg", `Location set to ${picked.lat}, ${picked.lon}. Save to keep it.`);
