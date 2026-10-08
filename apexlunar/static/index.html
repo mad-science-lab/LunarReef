@@ -1,4 +1,4 @@
-<!-- Version: V26.281.0239 -->
+<!-- Version: V26.281.0248 -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -75,7 +75,8 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
 <body>
 <header>
   <svg id="moonicon" width="44" height="44" viewBox="-1.1 -1.1 2.2 2.2" aria-hidden="true"></svg>
-  <div><h1>ApexLunar</h1><div class="sub" id="subtitle">Matching your Apex lunar lights to the real moon</div></div>
+  <div><h1>ApexLunar</h1><div class="sub" id="subtitle">Matching your Apex lunar lights to the real moon</div>
+    <div class="sub" style="font-size:12px">For EcoTech Radion XR15 lunar channels on a Neptune Apex MXM module</div></div>
 </header>
 <main>
   <section class="card span">
@@ -138,7 +139,10 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
     <fieldset><legend>Apex</legend>
       <div class="grid2">
         <div class="field"><label for="host">Address</label><input id="host"></div>
-        <div class="field"><label for="lunar">Lunar output (group master)</label><select id="lunar"></select></div>
+        <div class="field" style="grid-column:1/-1"><label for="lunar">Lunar output (group master)</label><select id="lunar"></select>
+          <div class="help">Pick a Radion XR15's lunar output (Apex type <code>15G6PL</code>, on the MXM module). With several
+            Radions, group their lunar outputs in Apex Fusion and pick the group master. Other MXM lights may work but are untested.</div>
+          <div class="help" id="lunarwarn" style="color:var(--bad)"></div></div>
         <div class="field"><label for="user">Username</label><input id="user" autocomplete="off"></div>
         <div class="field"><label for="pw">Password</label><input id="pw" type="password" autocomplete="new-password" placeholder="unchanged"></div>
       </div>
@@ -179,7 +183,7 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
   <div class="dlg-foot"><span class="help" style="margin:0">Scroll or pinch to zoom. Map &copy; OpenStreetMap contributors.</span>
     <div class="row"><button id="mapcancel" type="button">Cancel</button><button class="primary" id="mapuse" type="button" disabled>Use this spot</button></div></div>
 </dialog>
-<div style="position:fixed;bottom:10px;left:10px;font-size:11px;font-family:monospace;color:rgba(128,128,128,0.6);background:rgba(0,0,0,0.15);padding:3px 7px;border-radius:4px;z-index:9999;pointer-events:none;">V26.281.0239</div>
+<div style="position:fixed;bottom:10px;left:10px;font-size:11px;font-family:monospace;color:rgba(128,128,128,0.6);background:rgba(0,0,0,0.15);padding:3px 7px;border-radius:4px;z-index:9999;pointer-events:none;">V26.281.0248</div>
 <script>
 const $ = id => document.getElementById(id);
 let cfg = null, plan = null;
@@ -316,9 +320,17 @@ async function loadOutputs() {
   try {
     const outs = await api("/api/outputs");
     $("lunar").innerHTML = outs.map(o =>
-      `<option value="${esc(o.did)}" ${o.did === cfg.apex.lunar_did ? "selected" : ""}>${esc(o.name)} (${esc(o.did)})${o.gid && o.gid !== "0" ? " · group " + esc(o.gid) : ""}</option>`).join("");
+      `<option value="${esc(o.did)}" data-type="${esc(o.type || "")}" ${o.did === cfg.apex.lunar_did ? "selected" : ""}>${esc(o.name)} (${esc(o.did)})${o.gid && o.gid !== "0" ? " · group " + esc(o.gid) : ""}${isRadionLunar(o.type) ? " · Radion lunar" : ""}</option>`).join("");
+    lunarWarn();
   } catch (e) { /* keep the configured value */ }
 }
+const isRadionLunar = t => /^MXMLight\|Ecotech\|\w*PL$/i.test(t || "");
+function lunarWarn() {
+  const opt = $("lunar").selectedOptions[0], t = opt ? opt.dataset.type : "";
+  $("lunarwarn").textContent = t && !isRadionLunar(t)
+    ? `Heads up: this output is "${t}", not a Radion lunar channel. ApexLunar will rewrite its schedule table.` : "";
+}
+$("lunar").onchange = lunarWarn;
 
 async function save() {
   const channels = {};
