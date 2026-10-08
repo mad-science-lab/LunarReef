@@ -1,0 +1,6 @@
+# Version: V26.281.0130
+config.json
+backups/
+__pycache__/
+*.pyc
+state.json

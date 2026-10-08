@@ -1,0 +1,314 @@
+<!-- Version: V26.281.0145 -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ApexLunar</title>
+<style>
+:root{
+  --bg:#f4f5f8;--card:#ffffff;--ink:#1b1e27;--muted:#636a7a;--line:#dfe2ea;
+  --accent:#3b5bdb;--accent-ink:#fff;--moon:#c9a227;--alt:#8a94a8;--old:#b4bac7;
+  --ok:#2b8a3e;--bad:#c92a2a;--field:#fff;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0f121a;--card:#171b26;--ink:#e6e8ef;--muted:#9aa2b4;--line:#2a3040;
+  --accent:#7b93ff;--accent-ink:#0f121a;--moon:#f0c94a;--alt:#6f7a91;--old:#4a5266;
+  --ok:#69db7c;--bad:#ff8787;--field:#11151e;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{display:flex;align-items:center;gap:14px;padding:18px 16px 6px;max-width:1100px;margin:0 auto}
+header h1{font-size:20px;margin:0;font-weight:650;letter-spacing:.2px}
+header .sub{color:var(--muted);font-size:13px}
+main{max-width:1100px;margin:0 auto;padding:8px 16px 60px;display:grid;gap:14px;grid-template-columns:1fr}
+@media (min-width:900px){main{grid-template-columns:1.6fr 1fr}.span{grid-column:1/-1}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+.card h2{font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:0 0 12px;font-weight:600}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.stat .k{font-size:12px;color:var(--muted)}.stat .v{font-size:18px;font-weight:600}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button{font:inherit;border:1px solid var(--line);background:var(--field);color:var(--ink);padding:7px 14px;border-radius:8px;cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+button:disabled{opacity:.5;cursor:wait}
+input,select{font:inherit;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:7px;padding:6px 8px;width:100%}
+label{display:block;font-size:12px;color:var(--muted);margin-bottom:3px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.field{margin-bottom:10px}
+fieldset{border:1px solid var(--line);border-radius:10px;padding:10px 12px 2px;margin:0 0 12px}
+legend{font-size:12px;color:var(--muted);padding:0 4px}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:14px}
+th,td{text-align:left;padding:5px 6px;border-bottom:1px solid var(--line)}
+th{font-size:12px;color:var(--muted);font-weight:600}
+.tables{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:600px){.tables{grid-template-columns:1fr}}
+.legend{display:flex;gap:16px;font-size:12px;color:var(--muted);flex-wrap:wrap;margin-top:6px}
+.sw{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
+#chart{width:100%;height:auto;display:block}
+.msg{font-size:13px;margin-top:8px;min-height:1em}.msg.err{color:var(--bad)}.msg.ok{color:var(--ok)}
+pre{white-space:pre-wrap;margin:4px 0 0;font-size:12px;color:var(--muted)}
+.act{border-bottom:1px solid var(--line);padding:6px 0;font-size:13px}
+.act .t{color:var(--muted);font-size:12px}
+.check{display:flex;gap:8px;align-items:center;font-size:14px;color:var(--ink)}
+.check input{width:auto}
+.muted{color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <svg id="moonicon" width="44" height="44" viewBox="-1.1 -1.1 2.2 2.2" aria-hidden="true"></svg>
+  <div><h1>ApexLunar</h1><div class="sub" id="subtitle">Matching your Apex lunar lights to the real moon</div></div>
+</header>
+<main>
+  <section class="card span">
+    <h2>Moon</h2>
+    <div class="stats" id="stats"><div class="muted">Loading…</div></div>
+  </section>
+
+  <section class="card span">
+    <div class="row" style="justify-content:space-between;margin-bottom:8px">
+      <h2 style="margin:0">Lunar table</h2>
+      <div class="row">
+        <input type="date" id="day" style="width:auto">
+        <button id="today">Today</button>
+        <button id="refresh">Preview</button>
+        <button class="primary" id="apply">Apply to Apex</button>
+      </div>
+    </div>
+    <svg id="chart" viewBox="0 0 960 260" role="img" aria-label="Lunar intensity over the day"></svg>
+    <div class="legend">
+      <span><span class="sw" style="background:var(--moon)"></span>New table (master %)</span>
+      <span><span class="sw" style="background:var(--old)"></span>Table on the Apex now</span>
+      <span><span class="sw" style="background:var(--alt)"></span>Moon altitude (right axis)</span>
+    </div>
+    <div class="msg" id="applymsg"></div>
+    <div class="tables" style="margin-top:12px">
+      <div><h2>New table</h2><table id="proposed"></table></div>
+      <div><h2>On the Apex now</h2><table id="current"></table></div>
+    </div>
+    <div class="muted" id="target" style="margin-top:8px"></div>
+  </section>
+
+  <section class="card">
+    <h2>Settings</h2>
+    <fieldset><legend>Location</legend>
+      <div class="grid2">
+        <div class="field"><label for="lat">Latitude (north +)</label><input id="lat" type="number" step="0.0001"></div>
+        <div class="field"><label for="lon">Longitude (east +, west −)</label><input id="lon" type="number" step="0.0001"></div>
+      </div>
+      <div class="field"><button id="geo" type="button">Use this device's location</button></div>
+    </fieldset>
+    <fieldset><legend>Brightness</legend>
+      <div class="grid2">
+        <div class="field"><label for="maxi">Full-moon intensity %</label><input id="maxi" type="number" min="0" max="100"></div>
+        <div class="field"><label for="ramp">Full brightness at altitude °</label><input id="ramp" type="number" min="0.5" max="90" step="0.5"></div>
+        <div class="field"><label for="rows">Max table rows</label><input id="rows" type="number" min="3" max="24"></div>
+      </div>
+      <label class="check"><input type="checkbox" id="keepmix"> Keep the color mix already on the Apex</label>
+      <div class="grid2" id="mix" style="margin-top:8px"></div>
+    </fieldset>
+    <fieldset><legend>Apex</legend>
+      <div class="grid2">
+        <div class="field"><label for="host">Address</label><input id="host"></div>
+        <div class="field"><label for="lunar">Lunar output (group master)</label><select id="lunar"></select></div>
+        <div class="field"><label for="user">Username</label><input id="user" autocomplete="off"></div>
+        <div class="field"><label for="pw">Password</label><input id="pw" type="password" autocomplete="new-password" placeholder="unchanged"></div>
+      </div>
+    </fieldset>
+    <fieldset><legend>Daily update</legend>
+      <label class="check"><input type="checkbox" id="auto"> Write a new table every day while this app runs</label>
+      <div class="field" style="margin-top:8px"><label for="at">At (Apex clock)</label><input id="at" type="time" style="width:auto"></div>
+    </fieldset>
+    <button class="primary" id="save">Save settings</button>
+    <div class="msg" id="savemsg"></div>
+  </section>
+
+  <section class="card">
+    <h2>Activity</h2>
+    <div id="activity" class="muted">Nothing yet.</div>
+    <h2 style="margin-top:18px">Backups</h2>
+    <div id="backups" class="muted">None yet.</div>
+  </section>
+</main>
+<div style="position:fixed;bottom:10px;left:10px;font-size:11px;font-family:monospace;color:rgba(128,128,128,0.6);background:rgba(0,0,0,0.15);padding:3px 7px;border-radius:4px;z-index:9999;pointer-events:none;">V26.281.0145</div>
+<script>
+const $ = id => document.getElementById(id);
+let cfg = null, plan = null;
+
+async function api(path, body) {
+  const r = await fetch(path, body === undefined ? {} :
+    {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+function setMsg(id, text, kind) { const e = $(id); e.textContent = text; e.className = "msg " + (kind || ""); }
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+// ---------- moon icon: lit fraction + waxing side
+function drawMoon(illum, waxing) {
+  const k = 2 * illum - 1;                // terminator ellipse x-radius, -1..1
+  const sweepOuter = waxing ? 1 : 0;      // lit limb on the right when waxing (northern view)
+  const rx = Math.abs(k);
+  const sweepTerm = (k > 0) === waxing ? 1 : 0;  // crescent bulges toward the lit limb
+  const lit = `M0,-1 A1,1 0 0 ${sweepOuter} 0,1 A${rx},1 0 0 ${sweepTerm} 0,-1Z`;
+  $("moonicon").innerHTML =
+    `<circle r="1" fill="var(--old)" opacity=".45"/><path d="${lit}" fill="var(--moon)"/>`;
+}
+
+// ---------- chart
+function polyline(points, color, dash) {
+  return `<polyline fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" ${dash ? 'stroke-dasharray="6 5"' : ""} points="${points.join(" ")}"/>`;
+}
+function drawChart(p) {
+  const W = 960, H = 260, L = 40, R = 44, T = 12, B = 28, pw = W - L - R, ph = H - T - B;
+  const x = m => L + pw * m / 1440;
+  const maxI = Math.max(10, ...p.proposed.map(r => r.intensity), ...p.current.map(r => r.intensity));
+  const top = Math.ceil(maxI / 5) * 5;
+  const y = v => T + ph * (1 - v / top);
+  const ya = a => T + ph * (1 - (a + 90) / 180);
+  let g = "";
+  for (let h = 0; h <= 24; h += 3) {
+    g += `<line x1="${x(h*60)}" x2="${x(h*60)}" y1="${T}" y2="${T+ph}" stroke="var(--line)"/>` +
+         `<text x="${x(h*60)}" y="${H-8}" fill="var(--muted)" font-size="12" text-anchor="middle">${String(h).padStart(2,"0")}:00</text>`;
+  }
+  for (let v = 0; v <= top; v += top / 5)
+    g += `<text x="${L-6}" y="${y(v)+4}" fill="var(--muted)" font-size="12" text-anchor="end">${v}%</text>`;
+  for (const a of [-90, 0, 90])
+    g += `<text x="${W-R+6}" y="${ya(a)+4}" fill="var(--muted)" font-size="12">${a}°</text>`;
+  g += `<line x1="${L}" x2="${W-R}" y1="${ya(0)}" y2="${ya(0)}" stroke="var(--alt)" stroke-dasharray="2 4"/>`;
+  const step = rows => rows.length ? [...rows, {minute: 1440, intensity: rows[0].intensity}] : [];
+  g += polyline(p.moon.curve.map(c => `${x(c.m)},${ya(c.alt)}`), "var(--alt)", true);
+  g += polyline(step(p.current).map(r => `${x(r.minute)},${y(r.intensity)}`), "var(--old)");
+  g += polyline(p.proposed.map(r => `${x(r.minute)},${y(r.intensity)}`), "var(--moon)");
+  g += p.proposed.map(r => `<circle cx="${x(r.minute)}" cy="${y(r.intensity)}" r="3.5" fill="var(--moon)"><title>${r.time}  ${r.intensity}%</title></circle>`).join("");
+  $("chart").innerHTML = g;
+}
+
+function rowsTable(rows, colors) {
+  const head = `<tr><th>Time</th><th>Master</th>${colors.map(c => `<th>${esc(c)}</th>`).join("")}</tr>`;
+  return head + rows.map(r => `<tr><td>${r.time}</td><td>${r.intensity}%</td>${colors.map(c => `<td>${r.channels[c] ?? ""}</td>`).join("")}</tr>`).join("");
+}
+
+function showPlan(p) {
+  plan = p;
+  const m = p.moon;
+  drawMoon(m.illumination, m.waxing);
+  $("subtitle").textContent = `${m.phase} · ${Math.round(m.illumination*100)}% lit · ${m.latitude.toFixed(3)}, ${m.longitude.toFixed(3)}`;
+  const stat = (k, v) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`;
+  $("stats").innerHTML = stat("Phase", m.phase) + stat("Illuminated", Math.round(m.illumination*100) + "%") +
+    stat("Age", m.age_days + " days") + stat("Moonrise", m.rises.join(", ") || "—") +
+    stat("Moonset", m.sets.join(", ") || "—") + stat("Highest", `${Math.round(m.peak_altitude)}° at ${m.peak_time}`) +
+    stat("Apex clock", "UTC" + (m.utc_offset >= 0 ? "+" : "") + m.utc_offset);
+  $("day").value = m.date;
+  drawChart(p);
+  $("proposed").innerHTML = rowsTable(p.proposed, p.colors);
+  $("current").innerHTML = rowsTable(p.current, p.colors);
+  $("target").textContent = "Writes to " + p.members.map(x => `${x.name} (${x.did})`).join(" + ") +
+    (p.members.length > 1 ? " — the group copies the master's table" : "");
+  renderMix(p.colors);
+}
+
+function renderMix(colors) {
+  const ch = (cfg && cfg.table.channels) || {};
+  const fromPlan = plan && plan.proposed[0] ? plan.proposed[0].channels : {};
+  $("mix").innerHTML = colors.map(c =>
+    `<div class="field"><label>${esc(c)} %</label><input type="number" min="0" max="100" data-color="${esc(c)}" value="${ch[c] ?? fromPlan[c] ?? 0}"></div>`).join("");
+  $("mix").style.display = $("keepmix").checked ? "none" : "";
+}
+
+async function preview() {
+  setMsg("applymsg", "Reading the Apex…");
+  $("refresh").disabled = true;
+  try { showPlan(await api("/api/preview?date=" + ($("day").value || ""))); setMsg("applymsg", ""); }
+  catch (e) { setMsg("applymsg", e.message, "err"); }
+  finally { $("refresh").disabled = false; }
+}
+
+async function apply() {
+  const d = $("day").value;
+  if (!confirm(`Write the ${d} lunar table to the Apex? A backup is saved first.`)) return;
+  $("apply").disabled = true; setMsg("applymsg", "Writing…");
+  try {
+    const r = await api("/api/apply", {date: d});
+    setMsg("applymsg", r.log.join(" · "), "ok");
+    await preview(); setMsg("applymsg", r.log.join(" · "), "ok"); loadSide();
+  } catch (e) { setMsg("applymsg", e.message, "err"); }
+  finally { $("apply").disabled = false; }
+}
+
+async function loadConfig() {
+  cfg = await api("/api/config");
+  $("lat").value = cfg.location.latitude; $("lon").value = cfg.location.longitude;
+  $("maxi").value = cfg.table.max_intensity ?? 15; $("ramp").value = cfg.table.ramp_altitude_deg ?? 10;
+  $("rows").value = cfg.table.max_rows ?? 12; $("keepmix").checked = !cfg.table.channels;
+  $("host").value = cfg.apex.host || ""; $("user").value = cfg.apex.username || "";
+  $("pw").placeholder = cfg.apex.has_password ? "unchanged" : "not set";
+  $("lunar").innerHTML = `<option value="${esc(cfg.apex.lunar_did)}">${esc(cfg.apex.lunar_did)}</option>`;
+  $("auto").checked = !!(cfg.schedule && cfg.schedule.auto_apply);
+  $("at").value = (cfg.schedule && cfg.schedule.apply_at) || "00:05";
+}
+
+async function loadOutputs() {
+  try {
+    const outs = await api("/api/outputs");
+    $("lunar").innerHTML = outs.map(o =>
+      `<option value="${esc(o.did)}" ${o.did === cfg.apex.lunar_did ? "selected" : ""}>${esc(o.name)} (${esc(o.did)})${o.gid && o.gid !== "0" ? " · group " + esc(o.gid) : ""}</option>`).join("");
+  } catch (e) { /* keep the configured value */ }
+}
+
+async function save() {
+  const channels = {};
+  if (!$("keepmix").checked) document.querySelectorAll("#mix input").forEach(i => channels[i.dataset.color] = +i.value);
+  const body = {
+    location: {latitude: +$("lat").value, longitude: +$("lon").value},
+    table: {max_intensity: +$("maxi").value, ramp_altitude_deg: +$("ramp").value, max_rows: +$("rows").value,
+            channels: Object.keys(channels).length ? channels : null},
+    apex: {host: $("host").value, username: $("user").value, password: $("pw").value, lunar_did: $("lunar").value},
+    schedule: {auto_apply: $("auto").checked, apply_at: $("at").value || "00:05"},
+  };
+  try {
+    cfg = await api("/api/config", body); $("pw").value = "";
+    setMsg("savemsg", "Saved.", "ok"); preview(); loadSide();
+  } catch (e) { setMsg("savemsg", e.message, "err"); }
+}
+
+async function loadSide() {
+  try {
+    const s = await api("/api/status");
+    $("activity").innerHTML = s.activity.length ? s.activity.map(a =>
+      `<div class="act"><div class="t">${esc(a.at)}</div>${esc(a.msg)}${a.lines.length ? `<pre>${esc(a.lines.join("\n"))}</pre>` : ""}</div>`).join("")
+      : (s.state.last_applied ? `Last applied table: ${esc(s.state.last_applied)} (${esc(s.state.last_applied_at)})` : "Nothing yet.");
+    const b = await api("/api/backups");
+    $("backups").innerHTML = b.length ? `<table>${b.slice(0, 15).map(x =>
+      `<tr><td>${esc(x.file.slice(0, 15).replace(/(\d{4})(\d\d)(\d\d)-(\d\d)(\d\d)(\d\d)/, "$1-$2-$3 $4:$5"))}</td><td>${esc(x.name)}</td><td><button data-file="${esc(x.file)}">Restore</button></td></tr>`).join("")}</table>`
+      : "None yet.";
+    $("backups").querySelectorAll("button").forEach(btn => btn.onclick = async () => {
+      if (!confirm(`Put ${btn.dataset.file} back on the Apex?`)) return;
+      try { const r = await api("/api/restore", {file: btn.dataset.file}); alert(r.log.join("\n")); preview(); loadSide(); }
+      catch (e) { alert(e.message); }
+    });
+  } catch (e) { /* side panel is best-effort */ }
+}
+
+$("refresh").onclick = preview;
+$("today").onclick = () => { $("day").value = ""; preview(); };
+$("day").onchange = preview;
+$("apply").onclick = apply;
+$("save").onclick = save;
+$("keepmix").onchange = () => renderMix(plan ? plan.colors : []);
+$("geo").onclick = () => {
+  if (!navigator.geolocation) return setMsg("savemsg", "This browser can't share location.", "err");
+  navigator.geolocation.getCurrentPosition(
+    p => { $("lat").value = p.coords.latitude.toFixed(4); $("lon").value = p.coords.longitude.toFixed(4); setMsg("savemsg", "Location filled in — Save to keep it."); },
+    e => setMsg("savemsg", "Location unavailable: " + e.message, "err"));
+};
+
+(async () => {
+  try { await loadConfig(); } catch (e) { setMsg("savemsg", e.message, "err"); }
+  preview(); loadOutputs(); loadSide();
+  setInterval(loadSide, 60000);
+})();
+</script>
+</body>
+</html>
