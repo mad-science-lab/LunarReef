@@ -1,4 +1,4 @@
-# Version: V26.281.0145
+# Version: V26.281.0206
 """Local web app: standard-library HTTP server + a daily auto-apply loop."""
 from __future__ import annotations
 
@@ -193,8 +193,14 @@ def light_outputs(app: App) -> list[dict]:
 
 def serve(config_path: Path, bind: str = "127.0.0.1", port: int = 8788, open_browser: bool = True) -> None:
     app = App(config_path)
-    threading.Thread(target=app.scheduler, daemon=True).start()
-    httpd = ThreadingHTTPServer((bind, port), make_handler(app))
+    # No address reuse: on Windows it lets a second copy share the port silently.
+    ThreadingHTTPServer.allow_reuse_address = False
+    try:
+        httpd = ThreadingHTTPServer((bind, port), make_handler(app))
+    except OSError:
+        raise SystemExit(f"Port {port} is already in use - ApexLunar is probably already running. "
+                         f"Open http://127.0.0.1:{port}/ or start with --port <other>.")
+    threading.Thread(target=app.scheduler, daemon=True).start()  # only once we own the port
     url = f"http://{'127.0.0.1' if bind in ('0.0.0.0', '') else bind}:{port}/"
     print(f"ApexLunar running at {url}  (Ctrl+C to stop)")
     if open_browser:

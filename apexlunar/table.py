@@ -1,4 +1,4 @@
-# Version: V26.281.0141
+# Version: V26.281.0205
 """Turn a day of moon positions into an Apex light control table.
 
 An Apex light program is a list of `tdata` rows:
@@ -72,31 +72,34 @@ def sample_day(day: date, lat: float, lon: float, utc_offset_h: float,
     return out
 
 
-def _simplify(points: list[tuple[int, float]], tol: float) -> list[tuple[int, float]]:
-    """Douglas-Peucker on (minute, intensity); keeps both endpoints."""
-    if len(points) < 3:
-        return points
-    (x0, y0), (x1, y1) = points[0], points[-1]
-    worst, idx = -1.0, 0
-    for i in range(1, len(points) - 1):
+def _worst_point(points: list[tuple[int, float]], a: int, b: int) -> tuple[float, int]:
+    """Largest gap between the curve and a straight ramp from points[a] to points[b]."""
+    (x0, y0), (x1, y1) = points[a], points[b]
+    worst, idx = 0.0, a
+    for i in range(a + 1, b):
         x, y = points[i]
-        interp = y0 + (y1 - y0) * (x - x0) / (x1 - x0)
-        if abs(y - interp) > worst:
-            worst, idx = abs(y - interp), i
-    if worst <= tol:
-        return [points[0], points[-1]]
-    return _simplify(points[: idx + 1], tol)[:-1] + _simplify(points[idx:], tol)
+        err = abs(y - (y0 + (y1 - y0) * (x - x0) / (x1 - x0)))
+        if err > worst:
+            worst, idx = err, i
+    return worst, idx
+
+
+def _fit(points: list[tuple[int, float]], max_rows: int, done_below: float = 0.05) -> list[tuple[int, float]]:
+    """Spend up to max_rows on the curve: start with the day's endpoints, then keep
+    adding a row wherever the Apex's straight ramps miss the moon curve the most."""
+    keep = [0, len(points) - 1]
+    while len(keep) < max_rows:
+        best = max((_worst_point(points, a, b) for a, b in zip(keep, keep[1:])), key=lambda t: t[0])
+        if best[0] < done_below:  # the table already is the curve (e.g. moon down all day)
+            break
+        keep = sorted(keep + [best[1]])
+    return [points[i] for i in keep]
 
 
 def build_rows(samples: list[tuple[int, float, MoonState]], channels: tuple[int, ...],
                settings: TableSettings) -> list[Row]:
-    """Fewest rows (<= max_rows) whose linear ramps track the moon curve."""
-    pts = [(m, v) for m, v, _ in samples]
-    tol = 0.6  # rows are whole percents, so finer is noise
-    keep = _simplify(pts, tol)
-    while len(keep) > settings.max_rows:
-        tol *= 1.5
-        keep = _simplify(pts, tol)
+    """Up to max_rows rows, placed where they best follow the moon curve."""
+    keep = _fit([(m, v) for m, v, _ in samples], settings.max_rows)
     rows: list[Row] = []
     for m, v in keep:
         row = Row(m, int(round(v)), channels)
