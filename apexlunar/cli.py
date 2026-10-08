@@ -1,4 +1,4 @@
-# Version: V26.281.0234
+# Version: V26.281.0251
 """ApexLunar command line.
 
     python -m apexlunar web               local web app (default http://127.0.0.1:8788)
@@ -8,6 +8,7 @@
     python -m apexlunar restore FILE --write
     python -m apexlunar update            what the daily scheduled task runs
     python -m apexlunar schedule install [--at HH:MM] | uninstall | status | run
+    python -m apexlunar scheduler         built-in daily loop (Home Assistant add-on)
 """
 from __future__ import annotations
 
@@ -93,7 +94,8 @@ def cmd_schedule(cfg: dict, args) -> None:
         if not st.get("installed"):
             print("Not installed." if st.get("supported") else "Not supported on this system yet.")
         else:
-            print(f"Installed: daily at {st['at']} (and 1 minute after logon)")
+            extra = " (and 1 minute after logon)" if st.get("backend") == "Windows Task Scheduler" else ""
+            print(f"On: daily at {st['at']}{extra}, run by {st.get('backend')}")
             print(f"Next run:  {st['next_run']}")
             print(f"Last run:  {st['last_run'] or 'never'}   result: {st['last_result']}")
 
@@ -111,6 +113,11 @@ def cmd_restore(cfg: dict, args) -> None:
 def cmd_web(cfg: dict, args) -> None:
     from .web import serve
     serve(args.config, args.bind, args.port, open_browser=not args.no_browser)
+
+
+def cmd_scheduler(cfg: dict, args) -> None:
+    from .runner import main as run_scheduler
+    run_scheduler()
 
 
 def main(argv=None) -> None:
@@ -136,6 +143,7 @@ def main(argv=None) -> None:
     sc = sub.add_parser("schedule", help="install/remove the daily background update")
     sc.add_argument("action", choices=["install", "uninstall", "status", "run"])
     sc.add_argument("--at", help="HH:MM, computer clock (default from config, else 00:05)")
+    sub.add_parser("scheduler", help="run the built-in daily loop (used by the Home Assistant add-on)")
     args = p.parse_args(argv)
     if args.cmd is None:
         args = p.parse_args(["--config", str(args.config), "web"])  # double-click friendly
@@ -144,7 +152,8 @@ def main(argv=None) -> None:
     try:
         cfg = svc.load_config(args.config)
         {"web": cmd_web, "moon": cmd_moon, "preview": cmd_apply, "apply": cmd_apply,
-         "restore": cmd_restore, "update": cmd_update, "schedule": cmd_schedule}[args.cmd](cfg, args)
+         "restore": cmd_restore, "update": cmd_update, "schedule": cmd_schedule,
+         "scheduler": cmd_scheduler}[args.cmd](cfg, args)
     except (ApexError, svc.ConfigError) as e:
         sys.exit(f"Error: {e}")
 

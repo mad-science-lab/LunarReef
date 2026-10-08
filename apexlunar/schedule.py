@@ -1,10 +1,14 @@
-# Version: V26.281.0234
+# Version: V26.281.0251
 """Install the daily `apexlunar update` run with the operating system's scheduler.
 
 Windows: a Task Scheduler task with two triggers - every day at the chosen time
 (computer clock) and one minute after logon, so a day missed while the PC was
 off or asleep is caught up. "Run as soon as possible after a missed start" is
 on too. The task runs pythonw.exe, so no console window flashes.
+
+Home Assistant add-on (APEXLUNAR_ADDON=1): there is no OS scheduler to call, so
+`apexlunar scheduler` (runner.py) runs beside the web app in the container and
+these functions just turn it on/off and set its time in config.json.
 
 macOS (launchd) and Raspberry Pi (systemd timer) are planned; the `update`
 command they will run is the same.
@@ -13,6 +17,7 @@ from __future__ import annotations
 
 import csv
 import io
+import os
 import subprocess
 import sys
 import tempfile
@@ -20,9 +25,11 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from xml.sax.saxutils import escape
 
+from . import service as svc
 from .service import ROOT
 
 TASK_NAME = "ApexLunar Daily Update"
+ADDON = os.environ.get("APEXLUNAR_ADDON") == "1"
 
 
 class ScheduleError(RuntimeError):
@@ -95,6 +102,8 @@ def _require_windows() -> None:
 
 
 def install(at: str = "00:05") -> str:
+    if ADDON:
+        return _addon_set(True, at)
     _require_windows()
     datetime.strptime(at, "%H:%M")  # validates
     user = _run(["whoami"]).stdout.strip()
@@ -111,6 +120,8 @@ def install(at: str = "00:05") -> str:
 
 
 def uninstall() -> str:
+    if ADDON:
+        return _addon_set(False)
     _require_windows()
     r = _run(["schtasks", "/Delete", "/TN", TASK_NAME, "/F"])
     if r.returncode:
@@ -121,6 +132,9 @@ def uninstall() -> str:
 
 
 def run_now() -> str:
+    if ADDON:
+        subprocess.Popen([sys.executable, "-m", "apexlunar", "update", "--scheduled"], cwd=str(ROOT))
+        return "Started an update."
     _require_windows()
     r = _run(["schtasks", "/Run", "/TN", TASK_NAME])
     if r.returncode:
@@ -129,14 +143,16 @@ def run_now() -> str:
 
 
 def status() -> dict:
-    """{"supported", "installed", "at", "next_run", "last_run", "last_result"}."""
+    """{"supported", "installed", "at", "next_run", "last_run", "last_result", "backend"}."""
+    if ADDON:
+        return _addon_status()
     if sys.platform != "win32":
         return {"supported": False, "installed": False}
     r = _run(["schtasks", "/Query", "/TN", TASK_NAME, "/V", "/FO", "CSV"])
     if r.returncode:
         return {"supported": True, "installed": False}
     rows = list(csv.DictReader(io.StringIO(r.stdout)))
-    info = {"supported": True, "installed": True, "at": None,
+    info = {"supported": True, "installed": True, "at": None, "backend": "Windows Task Scheduler",
             "next_run": None, "last_run": None, "last_result": None}
     for row in rows:  # one row per trigger
         info["next_run"] = info["next_run"] or row.get("Next Run Time")
@@ -151,3 +167,34 @@ def status() -> dict:
     if info["last_run"] and info["last_run"].startswith("11/30/1999"):
         info["last_run"] = None  # Task Scheduler's "never ran"
     return info
+
+
+# ---------------------------------------------------------------- Home Assistant add-on
+
+def _addon_set(enabled: bool, at: str | None = None) -> str:
+    cfg = svc.load_config()
+    sch = cfg.setdefault("schedule", {})
+    sch["enabled"] = enabled
+    if at:
+        datetime.strptime(at, "%H:%M")  # validates
+        sch["apply_at"] = at
+    sch.pop("auto_apply", None)
+    svc.save_config(cfg)
+    return (f"Daily update on: every day at {sch.get('apply_at', '00:05')} (Home Assistant's clock)."
+            if enabled else "Daily update off.")
+
+
+def next_run_after(now: datetime, at: str) -> datetime:
+    hh, mm = (int(x) for x in at.split(":"))
+    nxt = now.replace(hour=hh, minute=mm, second=0, microsecond=0)
+    return nxt if nxt > now else nxt + timedelta(days=1)
+
+
+def _addon_status() -> dict:
+    sch = svc.load_config().get("schedule", {})
+    at = sch.get("apply_at", "00:05")
+    on = sch.get("enabled", True)
+    state = svc.read_state()
+    return {"supported": True, "installed": on, "at": at, "backend": "the add-on's scheduler",
+            "next_run": next_run_after(datetime.now(), at).strftime("%Y-%m-%d %H:%M") if on else None,
+            "last_run": state.get("last_run_at"), "last_result": None}

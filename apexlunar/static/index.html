@@ -1,4 +1,4 @@
-<!-- Version: V26.281.0248 -->
+<!-- Version: V26.281.0250 -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -153,12 +153,11 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
 
   <section class="card">
     <h2>Daily update <span class="badge off" id="schedbadge">checking…</span></h2>
-    <div class="help" style="margin:0 0 6px">A small background job, run by Windows Task Scheduler, writes each new day's
-      table, so this page doesn't need to stay open. It also runs a minute after you log in, to catch up if the
-      computer was off or asleep.</div>
+    <div class="help" style="margin:0 0 6px" id="schedhelp">A small background job writes each new day's
+      table, so this page doesn't need to stay open.</div>
     <dl class="kv" id="schedinfo"></dl>
     <div class="row">
-      <label for="at" class="muted" style="margin:0">Run at (this computer's clock)</label>
+      <label for="at" class="muted" style="margin:0">Run at (this machine's clock)</label>
       <input id="at" type="time" style="width:auto">
     </div>
     <div class="row" style="margin-top:10px">
@@ -183,13 +182,14 @@ dialog::backdrop{background:rgba(0,0,0,.5)}
   <div class="dlg-foot"><span class="help" style="margin:0">Scroll or pinch to zoom. Map &copy; OpenStreetMap contributors.</span>
     <div class="row"><button id="mapcancel" type="button">Cancel</button><button class="primary" id="mapuse" type="button" disabled>Use this spot</button></div></div>
 </dialog>
-<div style="position:fixed;bottom:10px;left:10px;font-size:11px;font-family:monospace;color:rgba(128,128,128,0.6);background:rgba(0,0,0,0.15);padding:3px 7px;border-radius:4px;z-index:9999;pointer-events:none;">V26.281.0248</div>
+<div style="position:fixed;bottom:10px;left:10px;font-size:11px;font-family:monospace;color:rgba(128,128,128,0.6);background:rgba(0,0,0,0.15);padding:3px 7px;border-radius:4px;z-index:9999;pointer-events:none;">V26.281.0250</div>
 <script>
 const $ = id => document.getElementById(id);
 let cfg = null, plan = null;
 
 async function api(path, body) {
-  const r = await fetch(path, body === undefined ? {} :
+  // Relative URL: behind Home Assistant's ingress proxy the page isn't served from "/".
+  const r = await fetch(path.replace(/^\//, ""), body === undefined ? {} :
     {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
   const j = await r.json();
   if (!r.ok) throw new Error(j.error || r.statusText);
@@ -352,6 +352,11 @@ function showSchedule(st) {
   const on = st.installed;
   $("schedbadge").textContent = !st.supported ? "not on this system yet" : on ? "on" : "off";
   $("schedbadge").className = "badge " + (on ? "on" : "off");
+  $("schedhelp").textContent = st.backend === "Windows Task Scheduler"
+    ? "A small background job, run by Windows Task Scheduler, writes each new day's table, so this page doesn't need to stay open. It also runs a minute after you log in, to catch up if the computer was off or asleep."
+    : st.backend
+    ? "A small background job inside the add-on writes each new day's table, so this page doesn't need to stay open. If the add-on was stopped at the scheduled time, it catches up as soon as it starts."
+    : "Automatic daily updates aren't set up for this system yet. Run \"python -m apexlunar update\" from your own scheduler.";
   if (document.activeElement !== $("at")) $("at").value = st.at || st.configured_at || "00:05";
   const s = st.state || {};
   const rows = [];

@@ -1,0 +1,28 @@
+# Version: V26.281.0251
+# Home Assistant add-on manifest for ApexLunar.
+name: ApexLunar
+version: "0.1.0"
+slug: apexlunar
+description: Makes the lunar channel of EcoTech Radion XR15 lights (Neptune Apex MXM module) follow the real moon at your location
+url: https://github.com/mad-science-lab/ApexLunar
+arch:
+  - aarch64
+  - amd64
+init: false
+startup: application
+boot: auto
+
+# The settings page is served through Ingress: Home Assistant's login protects it
+# and no port is published on the LAN.
+ingress: true
+ingress_port: 8788
+panel_icon: mdi:moon-waning-crescent
+panel_title: ApexLunar
+
+# Read-only use of Home Assistant's API for one thing: on first start, take the
+# latitude/longitude from HA's home location.
+homeassistant_api: true
+
+# Everything is configured in the web page (stored in /data/config.json).
+options: {}
+schema: {}

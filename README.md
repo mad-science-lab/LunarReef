@@ -1,4 +1,4 @@
-<!-- Version: V26.281.0247 -->
+<!-- Version: V26.281.0255 -->
 # ApexLunar
 
 Makes the lunar (moonlight) channel of EcoTech Radion XR15 lights on a Neptune Apex
@@ -48,6 +48,23 @@ and exits. The operating system's scheduler runs it:
   run's result under *Activity*.
 - **macOS / Raspberry Pi:** not automated yet - point cron/launchd/systemd at
   `python3 -m apexlunar update` in this folder.
+
+## Home Assistant add-on
+
+`addon/` packages ApexLunar as a local Home Assistant add-on (a Docker container
+managed by HA). The settings page opens from the HA sidebar through Ingress (HA's
+login, no published port); the daily update runs in the container via
+`apexlunar scheduler` on HA's timezone and catches up after a restart; settings,
+backups and the log live in the add-on's `/data`; on first start the location is
+taken from HA's home.
+
+```
+.uild_addon.ps1          # stages distpexlunar
+```
+
+Copy `distpexlunar` to `\<ha-ip>ddonspexlunar` (Samba add-on), then in HA:
+*Settings > Add-ons > Add-on Store > three-dot menu > Check for updates* and
+install **ApexLunar** from *Local add-ons*.
 
 Command line, if you prefer:
 

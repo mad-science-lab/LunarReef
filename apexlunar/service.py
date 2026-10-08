@@ -1,4 +1,4 @@
-# Version: V26.281.0234
+# Version: V26.281.0251
 """Shared logic for the CLI and the web app: config, planning, writing, backups."""
 from __future__ import annotations
 
@@ -12,11 +12,14 @@ from .table import (TableSettings, build_rows, fmt_minute, parse_tdata, replace_
                     rise_set, sample_day)
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_CONFIG = ROOT / "config.json"
+# Where settings, backups, state and the log live. The project folder by default;
+# the Home Assistant add-on points this at its persistent /data.
+DATA_DIR = Path(os.environ.get("APEXLUNAR_DATA") or ROOT)
+DEFAULT_CONFIG = DATA_DIR / "config.json"
 EXAMPLE_CONFIG = ROOT / "config.example.json"
-BACKUP_DIR = ROOT / "backups"
-STATE_FILE = ROOT / "state.json"
-ACTIVITY_LOG = ROOT / "logs" / "activity.jsonl"
+BACKUP_DIR = DATA_DIR / "backups"
+STATE_FILE = DATA_DIR / "state.json"
+ACTIVITY_LOG = DATA_DIR / "logs" / "activity.jsonl"
 ACTIVITY_KEEP = 500  # lines kept in the activity log
 
 
@@ -26,16 +29,37 @@ class ConfigError(RuntimeError):
 
 # ---------------------------------------------------------------- config
 
+def home_assistant_location() -> tuple[float, float] | None:
+    """Home Assistant's home lat/lon, when running as an add-on (needs homeassistant_api)."""
+    token = os.environ.get("SUPERVISOR_TOKEN")
+    if not token:
+        return None
+    import urllib.request
+    req = urllib.request.Request("http://supervisor/core/api/config",
+                                 headers={"Authorization": f"Bearer {token}"})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            c = json.load(r)
+        return float(c["latitude"]), float(c["longitude"])
+    except Exception:
+        return None
+
+
 def load_config(path: Path = DEFAULT_CONFIG) -> dict:
     if not path.exists():
         if path == DEFAULT_CONFIG and EXAMPLE_CONFIG.exists():
-            path.write_text(EXAMPLE_CONFIG.read_text(encoding="utf-8"), encoding="utf-8")
+            cfg = json.loads(EXAMPLE_CONFIG.read_text(encoding="utf-8"))
+            loc = home_assistant_location()  # first run in HA: start from HA's home
+            if loc:
+                cfg["location"] = {"latitude": round(loc[0], 4), "longitude": round(loc[1], 4)}
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
         else:
             raise ConfigError(f"No config at {path}. Copy config.example.json to config.json.")
     cfg = json.loads(path.read_text(encoding="utf-8"))
     cfg.setdefault("apex", {})
     cfg.setdefault("table", {})
-    cfg.setdefault("schedule", {"auto_apply": False, "apply_at": "00:05"})
+    cfg.setdefault("schedule", {"apply_at": "00:05"})
     for key, env in (("host", "APEX_HOST"), ("username", "APEX_USER"), ("password", "APEX_PASSWORD")):
         if os.environ.get(env):
             cfg["apex"][key] = os.environ[env]
