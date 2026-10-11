@@ -1,0 +1,15 @@
+{
+  "location": { "latitude": 24.5551, "longitude": -81.7800 },
+  "apex": {
+    "host": "192.168.1.199",
+    "username": "admin",
+    "password": "1234",
+    "lunar_did": "3_66"
+  },
+  "table": {
+    "max_intensity": 15,
+    "ramp_altitude_deg": 10,
+    "channels": null,
+    "max_rows": 12
+  }
+}

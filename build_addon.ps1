@@ -1,0 +1,35 @@
+# Version: V26.281.1108
+# Stage the LunarReef Home Assistant add-on into dist\lunarreef\ - a folder ready
+# to copy to the HA machine's /addons share (\<ha-ip>\addons\lunarreef).
+# Local add-ons build from their own folder only, so the Python package is
+# copied in beside the Dockerfile.
+$ErrorActionPreference = "Stop"
+$root = $PSScriptRoot
+$dist = Join-Path $root "dist\lunarreef"
+
+if (Test-Path $dist) { Remove-Item -Recurse -Force $dist }
+New-Item -ItemType Directory -Force $dist | Out-Null
+
+foreach ($f in "config.yaml", "build.yaml", "README.md", "CHANGELOG.md") {
+    Copy-Item (Join-Path $root "addon\$f") $dist
+}
+# The repo Dockerfile fetches LunarReef from the GitHub tag; for a local build,
+# swap in a version that copies the staged package instead.
+$df = (Get-Content (Join-Path $root "addon\Dockerfile") -Raw) -replace "`r`n", "`n"
+$df = [regex]::Replace($df, '(?s)# LunarReef itself.*?rm -rf /tmp/src
+',
+    "COPY lunarreef/ /opt/lunarreef/lunarreef/`nCOPY config.example.json /opt/lunarreef/`n")
+$df = $df.Replace("python3 tzdata curl", "python3 tzdata")
+[System.IO.File]::WriteAllText((Join-Path $dist "Dockerfile"), $df, (New-Object System.Text.UTF8Encoding($false)))
+
+# run.sh must be LF-only with no BOM or the container won't start
+$runsh = (Get-Content (Join-Path $root "addon\run.sh") -Raw) -replace "`r`n", "`n"
+[System.IO.File]::WriteAllText((Join-Path $dist "run.sh"), $runsh, (New-Object System.Text.UTF8Encoding($false)))
+
+Copy-Item (Join-Path $root "lunarreef") (Join-Path $dist "lunarreef") -Recurse
+Get-ChildItem (Join-Path $dist "lunarreef") -Recurse -Directory -Filter "__pycache__" | Remove-Item -Recurse -Force
+Copy-Item (Join-Path $root "config.example.json") $dist
+
+Write-Host "Staged add-on at: $dist"
+Write-Host "Next: copy it to \<ha-ip>\addons\lunarreef, then in HA: Settings > Add-ons > Add-on Store >"
+Write-Host "three-dot menu > Check for updates, and install LunarReef from 'Local add-ons'."
